@@ -12,6 +12,7 @@ import rpsRoutes from './routes/rps.js';
 import gradingRoutes from './routes/grading.js';
 import attendanceRoutes from './routes/attendance.js';
 import enrollmentRoutes from './routes/enrollment.js';
+import analyticsRoutes from './routes/analytics.js';
 
 // Load environment variables
 dotenv.config();
@@ -38,6 +39,7 @@ app.use('/api/rps', rpsRoutes);
 app.use('/api/grading', gradingRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/enrollment', enrollmentRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
