@@ -1,55 +1,83 @@
-# 📚 RPS Management System
+# RPS Management System - Project Documentation
 
-> Modern web-based RPS (Rencana Pembelajaran Semester) Management System for Indonesian Higher Education Institutions
-
-Full-stack application with **React (Vite)** frontend and **Express.js** backend, featuring organizational hierarchy management, role-based access control, cross-faculty lecturer assignments, and comprehensive curriculum planning tools.
-
----
-
-## 🌟 Key Features
-
-### Organizational Hierarchy
-- **3-Level Structure**: Institut → Fakultas → Program Studi
-- Multi-faculty and multi-program support
-- Hierarchical access control
-
-### Role-Based Access Control (RBAC)
-- **5 User Roles**: Admin Institusi, Dekan, Kaprodi, Dosen, Mahasiswa
-- Granular permissions per organizational level
-- Resource ownership verification
-
-### Cross-Faculty Management
-- **Lecturer Assignments**: Assign lecturers across faculties
-- Smart categorization (same-prodi → same-fakultas → cross-faculty)
-- Flexible assignment workflow
-
-### RPS Workflow
-- **Template & Instance Pattern**: Master templates by Kaprodi, instances by Dosen
-- **Approval Workflow**: Draft → Submit → Approve/Reject
-- Version control and revision tracking
-
-### Curriculum Management
-- **Multi-level CPL**: Institut, Fakultas, and Prodi level learning outcomes
-- CPMK and Sub-CPMK management
-- Bahan Kajian (study materials) integration
+**Version:** Phase 5.5  
+**Last Updated:** 2026-02-04  
+**Status:** Grading & Attendance Systems Complete
 
 ---
 
-## 🛠️ Tech Stack
+## 📋 Project Overview
 
-### Frontend
-- **React 18** with **Vite**
-- **Zustand** for state management
-- **TailwindCSS** for styling
-- **React Router** for navigation
-- **Lucide React** for icons
+RPS (Rencana Pembelajaran Semester) Management System adalah aplikasi web untuk mengelola perencanaan pembelajaran, penilaian, dan presensi mahasiswa dengan dukungan dual-mode grading (Legacy & OBE).
 
-### Backend
-- **Node.js** with **Express.js**
-- **PostgreSQL** database
-- **Sequelize** ORM
-- **JWT** authentication
-- **bcrypt** for password hashing
+**Tech Stack:**
+- **Backend:** Node.js + Express + PostgreSQL + Sequelize
+- **Frontend:** React + Vite + Tailwind CSS
+- **Auth:** JWT-based authentication with RBAC
+
+---
+
+## ✅ Completed Features
+
+### Phase 1-4: Core Foundation ✅
+- ✅ Database design & implementation
+- ✅ Authentication & RBAC (Role-Based Access Control)
+- ✅ Organizational structure (Fakultas, Prodi, Mahasiswa, Dosen)
+- ✅ Curriculum management (CPL, CPMK, Sub-CPMK)
+- ✅ Course management (Mata Kuliah, RPS)
+- ✅ Lecturer assignment (cross-faculty support)
+- ✅ RPS approval workflow (Dosen → Kaprodi → Approved/Rejected)
+- ✅ Frontend dashboard & UI integration
+
+### Phase 5.5: Grading System ✅
+
+**Backend APIs:**
+- ✅ Dual-mode grading configuration (Legacy/OBE)
+- ✅ Grade scales (Legacy: 5 grades, OBE: 9 grades)
+- ✅ Assessment component management
+- ✅ Student grade input (single + batch)
+- ✅ Final grade calculation (weighted average)
+- ✅ Auto-conversion: Angka (0-100) → Huruf (A-E) → IP (0-4.0)
+- ✅ Grade approval workflow
+
+**Frontend UI:**
+- ✅ Assessment setup page (component configuration)
+- ✅ Spreadsheet-like grade input interface
+- ✅ Auto-save functionality
+- ✅ Real-time huruf/IP conversion display
+- ✅ Final grade calculation
+
+**Key Features:**
+- Support for **Legacy mode**: UTS (30%), UAS (35%), Praktikum (20%), Tugas (10%), Soft Skill (5%)
+- Support for **OBE mode**: Sub-CPMK based assessment with flexible pertemuan ranges
+- Weight validation (must equal 100%)
+- Batch operations for efficiency
+
+### Phase 5.5: Attendance System ✅
+
+**Backend APIs:**
+- ✅ Attendance tracking per RPS pertemuan
+- ✅ 4 status types: Hadir, Izin, Sakit, Alpa
+- ✅ Single & bulk attendance marking
+- ✅ Student attendance report (with percentage)
+- ✅ Course attendance report (class summary)
+
+**Frontend UI:**
+- ✅ Attendance marking page for Dosen
+- ✅ Pertemuan selector
+- ✅ Student checklist with radio buttons
+- ✅ Real-time summary statistics
+- ✅ Notes field for absence reasons
+
+**Attendance Formula:**
+```
+Attendance % = (Hadir + Izin) / Total Pertemuan × 100
+```
+
+**Thresholds:**
+- 🔴 < 75%: At risk
+- 🟡 75-85%: Warning
+- 🟢 > 85%: Good
 
 ---
 
@@ -57,249 +85,228 @@ Full-stack application with **React (Vite)** frontend and **Express.js** backend
 
 ```
 rps/
-├── client/              # React frontend
-│   ├── src/
-│   │   ├── components/  # Reusable components
-│   │   ├── pages/       # Page components
-│   │   ├── stores/      # Zustand stores
-│   │   └── App.jsx      # Main app component
-│   └── package.json
-│
-├── server/              # Express backend
-│   ├── controllers/     # API controllers
+├── server/              # Backend (Node.js + Express)
 │   ├── models/          # Sequelize models
-│   ├── routes/          # API routes
+│   ├── controllers/     # Business logic
+│   ├── routes/          # API endpoints
 │   ├── middleware/      # Auth & validation
-│   ├── seeds/           # Database seeders
-│   └── server.js        # Main server file
-│
-└── README.md
+│   ├── seeders/         # Database seeders
+│   └── server.js        # Entry point
+├── client/              # Frontend (React + Vite)
+│   ├── src/
+│   │   ├── pages/       # Page components
+│   │   ├── components/  # Reusable components
+│   │   ├── lib/         # Utilities (axios, etc.)
+│   │   └── utils/       # Helper functions
+│   └── public/          # Static assets
+└── docs/                # Documentation
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🔑 User Roles & Permissions
+
+| Role      | Capabilities |
+|-----------|-------------|
+| **Admin** | Full system access, manage all entities |
+| **Dekan** | Faculty-level management, approve RPSs |
+| **Kaprodi** | Program-level management, approve RPSs, configure grading |
+| **Dosen** | Create/edit RPS, input grades, mark attendance |
+| **Mahasiswa** | View RPS, view grades & attendance (future) |
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js >= 18.x
-- PostgreSQL >= 14.x
-- npm or yarn
+- Node.js 18+
+- PostgreSQL 14+
 
 ### Installation
 
-1. **Clone the repository**
+1. **Clone repository:**
    ```bash
-   git clone <repository-url>
-   cd rps
+   git clone https://github.com/bangjamz/rps-management-system.git
+   cd rps-management-system
    ```
 
-2. **Setup Backend**
+2. **Backend setup:**
    ```bash
    cd server
    npm install
-   cp .env.example .env
-   # Edit .env with your database credentials
+   cp .env.example .env  # Configure database credentials
+   npm run dev
    ```
 
-3. **Setup Database**
+3. **Frontend setup:**
    ```bash
-   # Create PostgreSQL database
-   createdb rps_maker_db
-   
-   # Run seeders
-   npm run seed
-   ```
-
-4. **Setup Frontend**
-   ```bash
-   cd ../client
+   cd client
    npm install
+   npm run dev
    ```
 
-### Running the Application
+4. **Database setup:**
+   ```bash
+   # Run migrations (if using migrations)
+   # Or sync models
+   # Seeders will create sample data
+   ```
 
-**Development Mode:**
-
-```bash
-# Terminal 1 - Backend
-cd server
-npm run dev
-
-# Terminal 2 - Frontend
-cd client
-npm run dev
+### Default Credentials
 ```
-
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:5001/api
-
-### Default Login Credentials
-
-| Role | Username | Password |
-|------|----------|----------|
-| Admin Institusi | `admin_mahardika` | `password123` |
-| Dekan Teknik | `dekan_teknik` | `password123` |
-| Kaprodi IF | `kaprodi_informatika` | `password123` |
-| Dosen | `dosen_andi` | `password123` |
+Admin: admin@university.edu / admin123
+Kaprodi: kaprodi@university.edu / password123
+Dosen: dosen@university.edu / password123
+```
 
 ---
 
-## 📚 API Documentation
+## 📊 Database Models
 
-### Base URL
-```
-http://localhost:5001/api
-```
+### Core Models
+- `User` - System users with roles
+- `Fakultas`, `Prodi` - Organizational structure
+- `Mahasiswa`, `Dosen` - Student & lecturer data
+- `MataKuliah` - Course information
+- `RPS`, `RPSPertemuan` - Learning plans & meetings
 
-### Available Endpoints
+### Curriculum Models
+- `CPL`, `CPMK`, `SubCPMK` - Learning outcomes hierarchy
 
-**Authentication**
-- `POST /auth/login` - User login
-- `GET /auth/profile` - Get user profile
-- `PUT /auth/profile` - Update profile
+### Grading Models
+- `GradingSystem` - Grading configuration per prodi/semester
+- `GradeScale`, `GradeScaleDetail` - Grade conversion tables
+- `AssessmentComponent` - Assessment components (UTS/UAS/Sub-CPMK)
+- `StudentGrade` - Individual component scores
+- `FinalGrade` - Aggregated final grades
 
-**Organization**
-- `GET /organization/institusi` - Get institution info
-- `GET /organization/fakultas` - List faculties
-- `GET /organization/prodi` - List study programs
-
-**Dashboard**
-- `GET /dashboard/stats` - Role-specific statistics
-
-**Lecturer Assignments**
-- `GET /lecturer-assignments` - List assignments
-- `GET /lecturer-assignments/available-lecturers` - Get assignable lecturers
-- `POST /lecturer-assignments` - Create assignment
-- `PUT /lecturer-assignments/:id` - Update assignment
-- `DELETE /lecturer-assignments/:id` - Delete assignment
-
-**RPS**
-- `GET /rps` - List RPS (role-filtered)
-- `GET /rps/:id` - Get RPS details
-- `POST /rps` - Create RPS
-- `PUT /rps/:id` - Update RPS
-- `PUT /rps/:id/submit` - Submit for approval
-- `PUT /rps/:id/approve` - Approve RPS
-- `PUT /rps/:id/reject` - Reject RPS
-- `DELETE /rps/:id` - Delete RPS
-
-**Curriculum**
-- `GET /curriculum/cpl` - List learning outcomes
-- `GET /curriculum/cpmk` - List course outcomes
-- `GET /curriculum/bahan-kajian` - List study materials
+### Attendance Model
+- `Attendance` - Per-pertemuan attendance records
 
 ---
 
-## 🗄️ Database Schema
+## 🛣️ API Routes
 
-**Core Tables:**
-- `institusi` - Institution
-- `fakultas` - Faculties
-- `prodi` - Study Programs
-- `users` - All users (multi-role)
-- `dosen_assignments` - Lecturer assignments
-- `mata_kuliah` - Courses
-- `cpl` - Learning outcomes (multi-level)
-- `rps` - RPS templates & instances
-- `rps_pertemuan` - Weekly schedules
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+- `GET /api/auth/me` - Get current user
+
+### Grading
+- `GET /api/grading/config` - Get grading configuration
+- `POST /api/grading/config` - Set grading mode (legacy/OBE)
+- `GET /api/grading/components` - Get assessment components
+- `POST /api/grading/components` - Create component
+- `POST /api/grading/student-grades` - Input grade
+- `POST /api/grading/student-grades/batch` - Batch input
+- `POST /api/grading/final-grades/calculate` - Calculate final grade
+- `POST /api/grading/final-grades/approve` - Approve grades
+
+### Attendance
+- `GET /api/attendance/pertemuan/:id` - Get pertemuan attendance
+- `POST /api/attendance/mark` - Mark single attendance
+- `POST /api/attendance/bulk-mark` - Bulk mark attendance
+- `GET /api/attendance/report/student/:id` - Student report
+- `GET /api/attendance/report/course/:id` - Course report
+
+### RPS
+- `GET /api/rps` - List RPS documents
+- `GET /api/rps/:id` - Get RPS detail
+- `POST /api/rps` - Create RPS
+- `PUT /api/rps/:id` - Update RPS
+- `POST /api/rps/:id/approve` - Approve RPS
+- `POST /api/rps/:id/reject` - Reject RPS
 
 ---
 
-## 👥 User Roles & Permissions
+## 📖 Design Documents
 
-| Role | Permissions |
-|------|-------------|
-| **Admin Institusi** | Full system access, manage all organizational units |
-| **Dekan** | Manage faculty, assign lecturers, approve RPS in faculty |
-| **Kaprodi** | Manage prodi, assign lecturers, create RPS templates, approve RPS |
-| **Dosen** | Create RPS instances, manage own courses |
-| **Mahasiswa** | View courses and RPS (read-only) |
+For detailed design specifications, see:
+- [Grading System Design](./grading_system_design.md)
+- [Attendance System Design](./attendance_system_design.md)
 
 ---
 
-## 🔐 Environment Variables
+## 🔮 Future Enhancements
 
-**Server `.env`:**
-```env
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=rps_maker_db
-DB_USER=your_user
-DB_PASSWORD=your_password
+### Priority 1 (High Impact)
+1. **Student Enrollment Management**
+   - Assign students to courses
+   - Currently using mock data
+   
+2. **RPS Creation/Edit UI for Dosen**
+   - Dosen self-service RPS management
+   
+3. **Dashboard Analytics**
+   - CPL attainment charts
+   - Grade distribution graphs
+   - Attendance trends
 
-# Server
-PORT=5001
-NODE_ENV=development
+### Priority 2 (Medium Impact)
+4. **PDF Export & Templates**
+   - Customizable RPS templates
+   - Logo/header placement
+   
+5. **Email Notifications**
+   - RPS approval/rejection
+   - Grade submission
+   - Low attendance warnings
 
-# JWT
-JWT_SECRET=your_secret_key
-JWT_EXPIRES_IN=7d
+6. **Multiple Roles per User**
+   - Role switcher UI
+   - Support Kaprodi + Dosen simultaneously
 
-# Client URL
-CLIENT_URL=http://localhost:5173
-```
+### Priority 3 (Nice to Have)
+7. **QR Code Attendance**
+8. **Mahasiswa Self-Service Portal**
+9. **CPL Achievement Analytics**
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Backend tests
+# Backend tests (if implemented)
 cd server
 npm test
 
-# Frontend tests
+# Frontend tests (if implemented)
 cd client
 npm test
 ```
 
 ---
 
-## 📦 Deployment
+## 📝 Contributing
 
-### Backend
-```bash
-cd server
-npm run build
-npm start
-```
-
-### Frontend
-```bash
-cd client
-npm run build
-# Deploy dist/ folder to static hosting
-```
-
----
-
-## 🤝 Contributing
-
-This project is developed for Institut Mahardika. For contributions or modifications, please contact the development team.
+1. Create feature branch: `git checkout -b feature/your-feature`
+2. Commit changes: `git commit -m 'Add feature'`
+3. Push to branch: `git push origin feature/your-feature`
+4. Create Pull Request
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+[To be determined]
 
 ---
 
-## 🏫 About Institut Mahardika
+## 👥 Team
 
-Institut Teknologi dan Kesehatan Mahardika is a higher education institution committed to excellence in technology and health sciences education.
-
-**Website:** https://mahardika.ac.id
+- **Developer:** [Your Name]
+- **Institution:** [University Name]
+- **Project Type:** RPS Management System
 
 ---
 
 ## 📞 Support
 
-For issues, questions, or support, please contact:
-- Email: info@mahardika.ac.id
-- GitHub Issues: [Create an issue](<repository-url>/issues)
+For questions or issues, please contact:
+- Email: [support email]
+- GitHub Issues: [repository]/issues
 
 ---
 
-**Built with ❤️ for Indonesian Higher Education**
+**Last Build:** 2026-02-04  
+**Build Status:** ✅ Stable

@@ -12,6 +12,8 @@ import LecturerAssignmentPage from './pages/LecturerAssignmentPage';
 import RPSManagementPage from './pages/RPSManagementPage';
 import AssessmentSetupPage from './pages/AssessmentSetupPage';
 import GradeInputPage from './pages/GradeInputPage';
+import AttendanceMarkingPage from './pages/AttendanceMarkingPage';
+import EnrollmentManagementPage from './pages/EnrollmentManagementPage';
 import { ROLES } from './utils/permissions';
 
 function App() {
@@ -39,6 +41,7 @@ function App() {
                                     <Route path="curriculum" element={<CurriculumPage />} />
                                     <Route path="courses" element={<CoursesPage />} />
                                     <Route path="lecturer-assignments" element={<LecturerAssignmentPage />} />
+                                    <Route path="courses/:courseId/enrollment" element={<EnrollmentManagementPage />} />
                                     <Route path="rps/:courseId" element={<RPSViewPage />} />
                                     <Route path="rps" element={<RPSManagementPage />} />
                                     <Route path="reports" element={<div className="p-6"><h1 className="text-2xl font-bold">Reports Page (Coming Soon)</h1></div>} />
@@ -59,6 +62,7 @@ function App() {
                                     <Route path="courses" element={<div className="p-6"><h1 className="text-2xl font-bold">My Courses Page (Coming Soon)</h1></div>} />
                                     <Route path="courses/:courseId/assessment-setup" element={<AssessmentSetupPage />} />
                                     <Route path="courses/:courseId/grades" element={<GradeInputPage />} />
+                                    <Route path="courses/:courseId/attendance" element={<AttendanceMarkingPage />} />
                                     <Route path="rps" element={<div className="p-6"><h1 className="text-2xl font-bold">My RPS Page (Coming Soon)</h1></div>} />
                                     <Route path="grades" element={<div className="p-6"><h1 className="text-2xl font-bold">Grades Page (Coming Soon)</h1></div>} />
                                 </Routes>
