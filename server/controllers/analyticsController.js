@@ -77,19 +77,19 @@ export const getAttendanceTrends = async (req, res) => {
             include: [
                 {
                     model: RPSPertemuan,
-                    as: 'pertemuan',
+                    as: 'rpsPertemuan',
                     where: { rps_id: rps.id },
                     attributes: ['pertemuan_ke', 'tanggal', 'topik']
                 }
             ],
             attributes: [
-                [sequelize.col('pertemuan.pertemuan_ke'), 'week'],
-                [sequelize.col('pertemuan.tanggal'), 'date'],
+                [sequelize.col('rpsPertemuan.pertemuan_ke'), 'week'],
+                [sequelize.col('rpsPertemuan.tanggal'), 'date'],
                 'status',
                 [sequelize.fn('COUNT', sequelize.col('Attendance.id')), 'count']
             ],
-            group: ['pertemuan.pertemuan_ke', 'pertemuan.tanggal', 'status'],
-            order: [[sequelize.col('pertemuan.pertemuan_ke'), 'ASC']],
+            group: ['rpsPertemuan.pertemuan_ke', 'rpsPertemuan.tanggal', 'status'],
+            order: [[sequelize.col('rpsPertemuan.pertemuan_ke'), 'ASC']],
             raw: true
         });
 
