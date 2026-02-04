@@ -68,14 +68,31 @@
   - [ ] Course attendance report (Dosen) - optional
   - [ ] Excel export - optional
 
-## Phase 6: Frontend - Dosen Features  
-- [ ] Replace "Coming soon" with real features
-- [ ] Implement RPS creation and editing
-- [ ] Implement teaching schedule view
-- [ ] Implement course materials management
+## Phase 6: Essential Features (Priority 1 - WAJIB)
+- [/] Student Enrollment Management
+  - [ ] Database model (Enrollment)
+  - [ ] Backend APIs (enroll, unenroll, list)
+  - [ ] Frontend: Enrollment management UI
+  - [ ] Integration with grading & attendance
+- [ ] RPS Creation/Edit UI for Dosen
+  - [ ] Backend: RPS CRUD APIs for Dosen
+  - [ ] Excel-like editable grid interface
+  - [ ] Dropdown selectors with dependencies (CPL→CPMK→Sub-CPMK)
+  - [ ] Bulk create pertemuan
+- [ ] Dashboard Analytics Enhancement
+  - [ ] Grade distribution charts
+  - [ ] Attendance trends charts
+  - [ ] CPL attainment charts
+- [ ] CPL & CPMK Achievement Analytics
+  - [ ] CPL calculation algorithm (roll-up from assessments)
+  - [ ] Analytics dashboard with charts
+  - [ ] Class-wide CPL reports
 
-## Phase 7: Testing & Seed Data
-- [ ] Create comprehensive seed data for Institut Mahardika
-- [ ] Create dummy accounts for all roles
-- [ ] Test RBAC workflows
-- [ ] Test cross-faculty scenarios
+## Phase 7: Nice to Have (Priority 2)
+- [ ] PDF RPS Export with Templates
+- [ ] Email Notifications System
+- [ ] Multiple Roles per User
+
+## Phase 8: Advanced Features (Priority 3)
+- [ ] QR Code Attendance
+- [ ] Mahasiswa Self-Service Portal
