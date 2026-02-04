@@ -10,6 +10,8 @@ import CoursesPage from './pages/CoursesPage';
 import RPSViewPage from './pages/RPSViewPage';
 import LecturerAssignmentPage from './pages/LecturerAssignmentPage';
 import RPSManagementPage from './pages/RPSManagementPage';
+import AssessmentSetupPage from './pages/AssessmentSetupPage';
+import GradeInputPage from './pages/GradeInputPage';
 import { ROLES } from './utils/permissions';
 
 function App() {
@@ -55,6 +57,8 @@ function App() {
                                 <Routes>
                                     <Route path="dashboard" element={<DosenDashboard />} />
                                     <Route path="courses" element={<div className="p-6"><h1 className="text-2xl font-bold">My Courses Page (Coming Soon)</h1></div>} />
+                                    <Route path="courses/:courseId/assessment-setup" element={<AssessmentSetupPage />} />
+                                    <Route path="courses/:courseId/grades" element={<GradeInputPage />} />
                                     <Route path="rps" element={<div className="p-6"><h1 className="text-2xl font-bold">My RPS Page (Coming Soon)</h1></div>} />
                                     <Route path="grades" element={<div className="p-6"><h1 className="text-2xl font-bold">Grades Page (Coming Soon)</h1></div>} />
                                 </Routes>
