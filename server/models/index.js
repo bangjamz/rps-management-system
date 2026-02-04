@@ -159,6 +159,59 @@ PertemuanCPMK.belongsTo(CPMK, { foreignKey: 'cpmk_id', as: 'cpmk' });
 SubCPMK.hasMany(PertemuanCPMK, { foreignKey: 'sub_cpmk_id', as: 'pertemuan_mapping' });
 PertemuanCPMK.belongsTo(SubCPMK, { foreignKey: 'sub_cpmk_id', as: 'sub_cpmk' });
 
+// ========== GRADING SYSTEM ==========
+// GradingSystem -> Prodi
+GradingSystem.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Prodi.hasMany(GradingSystem, { foreignKey: 'prodi_id', as: 'gradingSystems' });
+
+// GradingSystem -> GradeScale
+GradingSystem.belongsTo(GradeScale, { foreignKey: 'grade_scale_id', as: 'gradeScale' });
+GradeScale.hasMany(GradingSystem, { foreignKey: 'grade_scale_id', as: 'gradingSystems' });
+
+// GradeScale -> GradeScaleDetails
+GradeScale.hasMany(GradeScaleDetail, { foreignKey: 'grade_scale_id', as: 'details' });
+GradeScaleDetail.belongsTo(GradeScale, { foreignKey: 'grade_scale_id', as: 'gradeScale' });
+
+// AssessmentComponent -> MataKuliah
+AssessmentComponent.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mataKuliah' });
+MataKuliah.hasMany(AssessmentComponent, { foreignKey: 'mata_kuliah_id', as: 'assessmentComponents' });
+
+// AssessmentComponent -> SubCPMK (OBE mode)
+AssessmentComponent.belongsTo(SubCPMK, { foreignKey: 'sub_cpmk_id', as: 'subCpmk' });
+SubCPMK.hasMany(AssessmentComponent, { foreignKey: 'sub_cpmk_id', as: 'assessmentComponents' });
+
+// StudentGrade -> Mahasiswa
+StudentGrade.belongsTo(Mahasiswa, { foreignKey: 'mahasiswa_id', as: 'mahasiswa' });
+Mahasiswa.hasMany(StudentGrade, { foreignKey: 'mahasiswa_id', as: 'studentGrades' });
+
+// StudentGrade -> MataKuliah
+StudentGrade.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mataKuliah' });
+MataKuliah.hasMany(StudentGrade, { foreignKey: 'mata_kuliah_id', as: 'studentGrades' });
+
+// StudentGrade -> AssessmentComponent
+StudentGrade.belongsTo(AssessmentComponent, { foreignKey: 'assessment_component_id', as: 'assessmentComponent' });
+AssessmentComponent.hasMany(StudentGrade, { foreignKey: 'assessment_component_id', as: 'studentGrades' });
+
+// StudentGrade -> User (graded_by)
+StudentGrade.belongsTo(User, { foreignKey: 'graded_by', as: 'gradedBy' });
+User.hasMany(StudentGrade, { foreignKey: 'graded_by', as: 'gradesGiven' });
+
+// FinalGrade -> Mahasiswa
+FinalGrade.belongsTo(Mahasiswa, { foreignKey: 'mahasiswa_id', as: 'mahasiswa' });
+Mahasiswa.hasMany(FinalGrade, { foreignKey: 'mahasiswa_id', as: 'finalGrades' });
+
+// FinalGrade -> MataKuliah
+FinalGrade.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mataKuliah' });
+MataKuliah.hasMany(FinalGrade, { foreignKey: 'mata_kuliah_id', as: 'finalGrades' });
+
+// FinalGrade -> GradingSystem
+FinalGrade.belongsTo(GradingSystem, { foreignKey: 'grading_system_id', as: 'gradingSystem' });
+GradingSystem.hasMany(FinalGrade, { foreignKey: 'grading_system_id', as: 'finalGrades' });
+
+// FinalGrade -> User (approved_by)
+FinalGrade.belongsTo(User, { foreignKey: 'approved_by', as: 'approvedBy' });
+User.hasMany(FinalGrade, { foreignKey: 'approved_by', as: 'gradesApproved' });
+
 // RPS -> Penilaian MK relationship
 RPS.hasMany(PenilaianMK, { foreignKey: 'rps_id', as: 'penilaian' });
 PenilaianMK.belongsTo(RPS, { foreignKey: 'rps_id', as: 'rps' });

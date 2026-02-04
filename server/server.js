@@ -9,6 +9,7 @@ import organizationRoutes from './routes/organization.js';
 import dashboardRoutes from './routes/dashboard.js';
 import lecturerAssignmentsRoutes from './routes/lecturerAssignments.js';
 import rpsRoutes from './routes/rps.js';
+import gradingRoutes from './routes/grading.js';
 
 // Load environment variables
 dotenv.config();
@@ -32,6 +33,7 @@ app.use('/api/organization', organizationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/lecturer-assignments', lecturerAssignmentsRoutes);
 app.use('/api/rps', rpsRoutes);
+app.use('/api/grading', gradingRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
