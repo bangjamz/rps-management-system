@@ -23,6 +23,7 @@ import GradeScaleDetail from './GradeScaleDetail.js';
 import AssessmentComponent from './AssessmentComponent.js';
 import StudentGrade from './StudentGrade.js';
 import FinalGrade from './FinalGrade.js';
+import Attendance from './Attendance.js';
 
 // Define associations
 
@@ -212,6 +213,19 @@ GradingSystem.hasMany(FinalGrade, { foreignKey: 'grading_system_id', as: 'finalG
 FinalGrade.belongsTo(User, { foreignKey: 'approved_by', as: 'approvedBy' });
 User.hasMany(FinalGrade, { foreignKey: 'approved_by', as: 'gradesApproved' });
 
+// ========== ATTENDANCE ==========
+// Attendance -> Mahasiswa
+Attendance.belongsTo(Mahasiswa, { foreignKey: 'mahasiswa_id', as: 'mahasiswa' });
+Mahasiswa.hasMany(Attendance, { foreignKey: 'mahasiswa_id', as: 'attendance' });
+
+// Attendance -> RPSPertemuan
+Attendance.belongsTo(RPSPertemuan, { foreignKey: 'rps_pertemuan_id', as: 'rpsPertemuan' });
+RPSPertemuan.hasMany(Attendance, { foreignKey: 'rps_pertemuan_id', as: 'attendance' });
+
+// Attendance -> User (marked_by)
+Attendance.belongsTo(User, { foreignKey: 'marked_by', as: 'markedBy' });
+User.hasMany(Attendance, { foreignKey: 'marked_by', as: 'attendanceMarked' });
+
 // RPS -> Penilaian MK relationship
 RPS.hasMany(PenilaianMK, { foreignKey: 'rps_id', as: 'penilaian' });
 PenilaianMK.belongsTo(RPS, { foreignKey: 'rps_id', as: 'rps' });
@@ -259,5 +273,6 @@ export {
     GradeScaleDetail,
     AssessmentComponent,
     StudentGrade,
-    FinalGrade
+    FinalGrade,
+    Attendance
 };
