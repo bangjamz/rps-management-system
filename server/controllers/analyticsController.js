@@ -7,7 +7,6 @@ import {
     RPSPertemuan,
     RPS,
     Prodi,
-    Dosen,
     Enrollment
 } from '../models/index.js';
 import { Op } from 'sequelize';
