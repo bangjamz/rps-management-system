@@ -16,7 +16,9 @@ import {
     createRPS as createRPSDosen,
     updateRPS as updateRPSDosen,
     bulkUpsertPertemuan,
-    getDosenCourses
+    getDosenCourses,
+    createCPMK,
+    createSubCPMK
 } from '../controllers/rpsDosenController.js';
 
 const router = express.Router();
@@ -30,6 +32,10 @@ router.get('/dosen/my-courses', authorize(ROLES.DOSEN, ROLES.KAPRODI), getDosenC
 router.post('/dosen/create', authorize(ROLES.DOSEN, ROLES.KAPRODI), createRPSDosen);
 router.put('/dosen/:rpsId/update', authorize(ROLES.DOSEN, ROLES.KAPRODI, ROLES.DEKAN), updateRPSDosen);
 router.post('/dosen/:rpsId/pertemuan/bulk', authorize(ROLES.DOSEN, ROLES.KAPRODI, ROLES.DEKAN), bulkUpsertPertemuan);
+
+// Curriculum Data Creation (for RPS context)
+router.post('/curriculum/cpmk', authorize(ROLES.DOSEN, ROLES.KAPRODI), createCPMK);
+router.post('/curriculum/sub-cpmk', authorize(ROLES.DOSEN, ROLES.KAPRODI), createSubCPMK);
 
 // ========== GENERAL RPS ROUTES ==========
 // Get all RPS (role-filtered)

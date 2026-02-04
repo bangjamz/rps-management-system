@@ -43,8 +43,10 @@ export default function RPSEditorPage() {
     // --- State: Capaian Pembelajaran ---
     const [availableCPLs, setAvailableCPLs] = useState([]);
     const [selectedCPLs, setSelectedCPLs] = useState([]);
-    const [cpmkList, setCpmkList] = useState([]);
-    const [subCpmkList, setSubCpmkList] = useState([]);
+    const [selectedCPMKs, setSelectedCPMKs] = useState([]); // Array of IDs linked to this RPS
+    const [activeCpl, setActiveCpl] = useState(null); // ID for expanding UI to add new CPMK
+    const [newCpmk, setNewCpmk] = useState({ kode: '', deskripsi: '' });
+    const [newSubCpmk, setNewSubCpmk] = useState({ kode: '', deskripsi: '' });
 
     // --- State: Weekly Schedule ---
     const [rows, setRows] = useState([]);
@@ -112,9 +114,10 @@ export default function RPSEditorPage() {
         }
     };
 
-    const fetchCPLs = async (prodiId) => {
+    const fetchCPLs = async (prodiId, courseId = null) => {
         try {
-            const res = await axios.get(`/rps/curriculum/tree/${prodiId}`);
+            const query = courseId ? `?courseId=${courseId}` : '';
+            const res = await axios.get(`/rps/curriculum/tree/${prodiId}${query}`);
             setAvailableCPLs(res.data.cpls || []);
         } catch (error) {
             console.error('Error fetching CPLs:', error);
@@ -129,6 +132,9 @@ export default function RPSEditorPage() {
             nama_mk: state.nama_mk || '',
             sks: state.sks || ''
         }));
+        if (state.prodi_id) {
+            fetchCPLs(state.prodi_id, state.courseId);
+        }
         if (rows.length === 0) initializeRows(14);
     };
 
@@ -143,6 +149,9 @@ export default function RPSEditorPage() {
                 nama_mk: course.nama_mk,
                 sks: course.sks
             }));
+            if (course.prodi_id) {
+                fetchCPLs(course.prodi_id, courseId);
+            }
             if (rows.length === 0) initializeRows(14);
         }
     };
@@ -233,51 +242,55 @@ export default function RPSEditorPage() {
         );
     };
 
-    const addCPMK = () => {
-        setCpmkList([...cpmkList, {
-            id: Date.now(),
-            kode: `CPMK-${cpmkList.length + 1}`,
-            deskripsi: '',
-            cpl_ids: []
-        }]);
+    const toggleCPMK = (id) => {
+        if (selectedCPMKs.includes(id)) {
+            setSelectedCPMKs(prev => prev.filter(c => c !== id));
+        } else {
+            setSelectedCPMKs(prev => [...prev, id]);
+        }
     };
 
-    const updateCPMK = (index, field, value) => {
-        const updated = [...cpmkList];
-        updated[index] = { ...updated[index], [field]: value };
-        setCpmkList(updated);
+    const handleAddCPMK = async (cplId, cplKode) => {
+        try {
+            if (!formData.mata_kuliah_id) return alert('Pilih mata kuliah terlebih dahulu');
+
+            await axios.post('/rps/curriculum/cpmk', {
+                mata_kuliah_id: formData.mata_kuliah_id,
+                cpl_id: cplId,
+                kode_cpmk: newCpmk.kode || `${cplKode}-01`,
+                deskripsi: newCpmk.deskripsi
+            });
+
+            // Refresh tree
+            const course = courses.find(c => c.id === parseInt(formData.mata_kuliah_id));
+            if (course) fetchCPLs(course.prodi_id, course.id);
+
+            // Reset form
+            setNewCpmk({ kode: '', deskripsi: '' });
+            setActiveCpl(null);
+        } catch (error) {
+            console.error('Failed to add CPMK:', error);
+            alert('Gagal menambah CPMK');
+        }
     };
 
-    const deleteCPMK = (index) => {
-        setCpmkList(cpmkList.filter((_, i) => i !== index));
-    };
+    const handleAddSubCPMK = async (cpmkId, cpmkKode) => {
+        try {
+            await axios.post('/rps/curriculum/sub-cpmk', {
+                cpmk_id: cpmkId,
+                kode: newSubCpmk.kode || `${cpmkKode}.1`,
+                deskripsi: newSubCpmk.deskripsi
+            });
 
-    const toggleCPMKCPL = (cpmkIndex, cplId) => {
-        const updated = [...cpmkList];
-        const cpmk = updated[cpmkIndex];
-        cpmk.cpl_ids = cpmk.cpl_ids.includes(cplId)
-            ? cpmk.cpl_ids.filter(id => id !== cplId)
-            : [...cpmk.cpl_ids, cplId];
-        setCpmkList(updated);
-    };
+            // Refresh tree
+            const course = courses.find(c => c.id === parseInt(formData.mata_kuliah_id));
+            if (course) fetchCPLs(course.prodi_id, course.id);
 
-    const addSubCPMK = () => {
-        setSubCpmkList([...subCpmkList, {
-            id: Date.now(),
-            kode: `SubCPMK-${subCpmkList.length + 1}`,
-            deskripsi: '',
-            cpmk_id: ''
-        }]);
-    };
-
-    const updateSubCPMK = (index, field, value) => {
-        const updated = [...subCpmkList];
-        updated[index] = { ...updated[index], [field]: value };
-        setSubCpmkList(updated);
-    };
-
-    const deleteSubCPMK = (index) => {
-        setSubCpmkList(subCpmkList.filter((_, i) => i !== index));
+            setNewSubCpmk({ kode: '', deskripsi: '' });
+        } catch (error) {
+            console.error('Failed to add Sub-CPMK:', error);
+            alert('Gagal menambah Sub-CPMK');
+        }
     };
 
     // --- Row Management ---
@@ -364,15 +377,14 @@ export default function RPSEditorPage() {
             setLoading(true);
 
             // If editing existing RPS, update instead of create
+            // If editing existing RPS, update instead of create
             if (currentRPSId) {
                 await axios.put(`/rps/dosen/${currentRPSId}/update`, {
                     deskripsi_mk: formData.deskripsi_mk,
                     rumpun_mk: formData.rumpun_mk,
                     pengembang_rps: formData.pengembang_rps,
                     ketua_prodi: formData.ketua_prodi,
-                    cpl_ids: selectedCPLs,
-                    cpmk_list: cpmkList,
-                    sub_cpmk_list: subCpmkList
+                    cpl_ids: selectedCPLs
                 });
                 if (rows.length > 0) {
                     await axios.post(`/rps/dosen/${currentRPSId}/pertemuan/bulk`, { pertemuan: rows });
@@ -388,9 +400,7 @@ export default function RPSEditorPage() {
                     rumpun_mk: formData.rumpun_mk,
                     pengembang_rps: formData.pengembang_rps,
                     ketua_prodi: formData.ketua_prodi,
-                    cpl_ids: selectedCPLs,
-                    cpmk_list: cpmkList,
-                    sub_cpmk_list: subCpmkList
+                    cpl_ids: selectedCPLs
                 });
                 const newRpsId = res.data.rps?.id || res.data.id;
                 setCurrentRPSId(newRpsId);
@@ -598,88 +608,129 @@ export default function RPSEditorPage() {
                                 <div className="flex justify-between items-center mb-3">
                                     <div>
                                         <h3 className="font-bold text-lg text-gray-900 dark:text-white">Capaian Pembelajaran Mata Kuliah (CPMK)</h3>
-                                        <p className="text-sm text-gray-500">CPMK adalah turunan dari CPL yang dipilih di atas</p>
+                                        <p className="text-sm text-gray-500">Pilih CPMK yang akan dibebankan pada mata kuliah ini.</p>
                                     </div>
-                                    <button onClick={addCPMK} disabled={selectedCPLs.length === 0} className="btn btn-outline btn-sm disabled:opacity-50">
-                                        <Plus size={16} className="mr-1" /> Tambah CPMK
-                                    </button>
                                 </div>
-                                {selectedCPLs.length === 0 && (
-                                    <p className="text-amber-600 text-sm italic mb-3">⚠️ Pilih minimal 1 CPL terlebih dahulu</p>
-                                )}
-                                <div className="space-y-3">
-                                    {cpmkList.map((cpmk, idx) => (
-                                        <div key={cpmk.id} className="border rounded-lg p-4 bg-white dark:bg-gray-800">
-                                            <div className="flex gap-4 items-start">
-                                                <div className="w-32">
-                                                    <label className="label text-xs">Kode CPMK</label>
-                                                    <input type="text" value={cpmk.kode} onChange={e => updateCPMK(idx, 'kode', e.target.value)} className="input w-full text-sm" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <label className="label text-xs">Deskripsi</label>
-                                                    <textarea value={cpmk.deskripsi} onChange={e => updateCPMK(idx, 'deskripsi', e.target.value)} className="input w-full text-sm" rows="2" />
-                                                </div>
-                                                <button onClick={() => deleteCPMK(idx)} className="text-red-500 hover:text-red-700 mt-6"><Trash2 size={18} /></button>
-                                            </div>
-                                            <div className="mt-3">
-                                                <label className="label text-xs">CPL Yang Didukung</label>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {selectedCPLs.map(cplId => {
-                                                        const cpl = availableCPLs.find(c => c.id === cplId);
-                                                        return cpl ? (
-                                                            <label key={cplId} className={`flex items-center gap-1 text-xs px-2 py-1 rounded cursor-pointer border ${cpmk.cpl_ids.includes(cplId) ? 'bg-blue-100 border-blue-300 dark:bg-blue-900/50' : 'bg-gray-100 dark:bg-gray-700 border-transparent'
-                                                                }`}>
-                                                                <input type="checkbox" checked={cpmk.cpl_ids.includes(cplId)} onChange={() => toggleCPMKCPL(idx, cplId)} className="h-3 w-3" />
-                                                                {cpl.kode}
-                                                            </label>
-                                                        ) : null;
-                                                    })}
-                                                </div>
-                                            </div>
+                                <div className="space-y-4">
+                                    {selectedCPLs.length === 0 ? (
+                                        <div className="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded text-center text-yellow-700 dark:text-yellow-400">
+                                            Silakan pilih CPL terlebih dahulu di atas.
                                         </div>
-                                    ))}
-                                    {cpmkList.length === 0 && selectedCPLs.length > 0 && (
-                                        <p className="text-gray-500 text-sm italic">Belum ada CPMK. Klik "Tambah CPMK".</p>
-                                    )}
-                                </div>
-                            </div>
+                                    ) : (
+                                        selectedCPLs.map(cplId => {
+                                            const cpl = availableCPLs.find(c => c.id === cplId);
+                                            if (!cpl) return null;
 
-                            {/* SubCPMK Editor */}
-                            <div>
-                                <div className="flex justify-between items-center mb-3">
-                                    <div>
-                                        <h3 className="font-bold text-lg text-gray-900 dark:text-white">Sub-CPMK</h3>
-                                        <p className="text-sm text-gray-500">Detail pencapaian per CPMK</p>
-                                    </div>
-                                    <button onClick={addSubCPMK} disabled={cpmkList.length === 0} className="btn btn-outline btn-sm disabled:opacity-50">
-                                        <Plus size={16} className="mr-1" /> Tambah Sub-CPMK
-                                    </button>
-                                </div>
-                                <div className="space-y-3">
-                                    {subCpmkList.map((sub, idx) => (
-                                        <div key={sub.id} className="border rounded-lg p-4 bg-white dark:bg-gray-800">
-                                            <div className="flex gap-4 items-start">
-                                                <div className="w-32">
-                                                    <label className="label text-xs">Kode</label>
-                                                    <input type="text" value={sub.kode} onChange={e => updateSubCPMK(idx, 'kode', e.target.value)} className="input w-full text-sm" />
+                                            // Ensure cpmks is array
+                                            const cpmks = cpl.cpmks || [];
+
+                                            return (
+                                                <div key={cpl.id} className="border rounded-lg p-4 bg-white dark:bg-gray-800">
+                                                    <div className="flex justify-between items-center mb-4">
+                                                        <h4 className="font-bold text-gray-800 dark:text-gray-200 border-b pb-2 flex-1">
+                                                            Turunan dari {cpl.kode}
+                                                            <span className="text-xs font-normal text-gray-500 ml-2 block sm:inline">{cpl.deskripsi.substring(0, 60)}...</span>
+                                                        </h4>
+                                                        <button
+                                                            onClick={() => setActiveCpl(activeCpl === cpl.id ? null : cpl.id)}
+                                                            className="btn btn-xs btn-outline ml-2"
+                                                        >
+                                                            {activeCpl === cpl.id ? 'Tutup' : 'Tambah Baru'}
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Existing CPMKs Checkbox List */}
+                                                    <div className="space-y-2 mb-4">
+                                                        {cpmks.length > 0 ? (
+                                                            cpmks.map(cpmk => (
+                                                                <div key={cpmk.id} className="ml-4 border-l-2 border-gray-200 dark:border-gray-700 pl-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-750 rounded-r transition-colors">
+                                                                    <label className="flex items-start gap-3 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={selectedCPMKs.includes(cpmk.id)}
+                                                                            onChange={() => toggleCPMK(cpmk.id)}
+                                                                            className="mt-1 h-4 w-4 text-blue-600 rounded"
+                                                                        />
+                                                                        <div className="flex-1">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="font-bold text-blue-600 dark:text-blue-400">{cpmk.kode}</span>
+                                                                                {cpmk.mata_kuliah_id === formData.mata_kuliah_id && (
+                                                                                    <span className="badge badge-xs badge-info">Custom</span>
+                                                                                )}
+                                                                                {cpmk.is_template && (
+                                                                                    <span className="badge badge-xs">Template</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <p className="text-sm text-gray-700 dark:text-gray-300">{cpmk.deskripsi}</p>
+
+                                                                            {/* Sub-CPMK Visual */}
+                                                                            {cpmk.subCpmks && cpmk.subCpmks.length > 0 && (
+                                                                                <div className="mt-2 text-xs text-gray-500">
+                                                                                    <span className="font-semibold">Sub-CPMK:</span>
+                                                                                    <ul className="list-disc list-inside ml-2">
+                                                                                        {cpmk.subCpmks.map(s => (
+                                                                                            <li key={s.id}>{s.kode}: {s.deskripsi.substring(0, 50)}...</li>
+                                                                                        ))}
+                                                                                    </ul>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {/* Option to Add Sub-CPMK (If CPMK is selected) */}
+                                                                            {selectedCPMKs.includes(cpmk.id) && (
+                                                                                <button
+                                                                                    onClick={(e) => { e.preventDefault(); /* TODO: Open Modal */ }}
+                                                                                    className="text-xs text-blue-500 mt-1 hover:underline"
+                                                                                >+ Tambah Sub-CPMK</button>
+                                                                            )}
+                                                                        </div>
+                                                                    </label>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <p className="text-sm text-gray-400 italic ml-4">Belum ada CPMK untuk kurikulum ini.</p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Form Add New CPMK (Direct to DB) */}
+                                                    {activeCpl === cpl.id && (
+                                                        <div className="mt-4 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-blue-100">
+                                                            <h5 className="font-semibold text-sm mb-2 text-blue-700">Tambah CPMK Baru ke Database</h5>
+                                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                                <div>
+                                                                    <label className="text-xs font-semibold">Kode</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Misal: CPMK-01"
+                                                                        className="input input-sm w-full"
+                                                                        value={newCpmk.kode || `${cpl.kode}-`}
+                                                                        onChange={e => setNewCpmk({ ...newCpmk, kode: e.target.value })}
+                                                                    />
+                                                                </div>
+                                                                <div className="md:col-span-3">
+                                                                    <label className="text-xs font-semibold">Deskripsi</label>
+                                                                    <div className="flex gap-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Deskripsi kemampuan..."
+                                                                            className="input input-sm w-full"
+                                                                            value={newCpmk.deskripsi}
+                                                                            onChange={e => setNewCpmk({ ...newCpmk, deskripsi: e.target.value })}
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => handleAddCPMK(cpl.id, cpl.kode)}
+                                                                            disabled={!newCpmk.kode || !newCpmk.deskripsi}
+                                                                            className="btn btn-sm btn-primary"
+                                                                        >
+                                                                            Simpan
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="flex-1">
-                                                    <label className="label text-xs">Deskripsi</label>
-                                                    <textarea value={sub.deskripsi} onChange={e => updateSubCPMK(idx, 'deskripsi', e.target.value)} className="input w-full text-sm" rows="2" />
-                                                </div>
-                                                <div className="w-40">
-                                                    <label className="label text-xs">CPMK Parent</label>
-                                                    <select value={sub.cpmk_id} onChange={e => updateSubCPMK(idx, 'cpmk_id', e.target.value)} className="input w-full text-sm">
-                                                        <option value="">Pilih CPMK...</option>
-                                                        {cpmkList.map(c => <option key={c.id} value={c.id}>{c.kode}</option>)}
-                                                    </select>
-                                                </div>
-                                                <button onClick={() => deleteSubCPMK(idx)} className="text-red-500 hover:text-red-700 mt-6"><Trash2 size={18} /></button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {subCpmkList.length === 0 && cpmkList.length > 0 && (
-                                        <p className="text-gray-500 text-sm italic">Belum ada Sub-CPMK.</p>
+                                            );
+                                        })
                                     )}
                                 </div>
                             </div>
@@ -732,15 +783,20 @@ export default function RPSEditorPage() {
                                                 <td className="px-1 py-1">
                                                     <select value={row.cpmk_id} onChange={e => updateRow(index, 'cpmk_id', e.target.value)} className="w-full px-1 py-1 border rounded text-xs dark:bg-gray-800">
                                                         <option value="">-</option>
-                                                        {cpmkList.map(c => <option key={c.id} value={c.id}>{c.kode}</option>)}
+                                                        {availableCPLs.flatMap(c => c.cpmks || []).filter(c => selectedCPMKs.includes(c.id)).map(c => <option key={c.id} value={c.id}>{c.kode}</option>)}
                                                     </select>
                                                 </td>
                                                 <td className="px-1 py-1">
                                                     <select value={row.sub_cpmk_id} onChange={e => updateRow(index, 'sub_cpmk_id', e.target.value)} className="w-full px-1 py-1 border rounded text-xs dark:bg-gray-800">
                                                         <option value="">-</option>
-                                                        {subCpmkList.filter(s => !row.cpmk_id || s.cpmk_id == row.cpmk_id).map(s => (
-                                                            <option key={s.id} value={s.id}>{s.kode}</option>
-                                                        ))}
+                                                        {(() => {
+                                                            const allCpmks = availableCPLs.flatMap(c => c.cpmks || []);
+                                                            const selectedCpmk = allCpmks.find(c => c.id == row.cpmk_id);
+                                                            const subs = selectedCpmk ? (selectedCpmk.subCpmks || []) : [];
+                                                            return subs.map(s => (
+                                                                <option key={s.id} value={s.id}>{s.kode}</option>
+                                                            ));
+                                                        })()}
                                                     </select>
                                                 </td>
                                                 <td className="px-1 py-1">
