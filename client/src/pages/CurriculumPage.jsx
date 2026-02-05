@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import axios from '../lib/axios';
 import { downloadCSVTemplate } from '../utils/csvHelper';
 import { hasPermission, PERMISSIONS } from '../utils/permissions';
-import { InformationCircleIcon, ListBulletIcon, TableCellsIcon, Squares2X2Icon, TrashIcon, PlusIcon, ArrowDownTrayIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
+import { Info, List, Table, LayoutGrid, Trash2, Plus, FileDown, FileUp } from 'lucide-react';
 
 // Prefix Mapping
 const UNIT_PREFIXES = {
@@ -295,7 +295,7 @@ export default function CurriculumPage() {
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         Data Kurikulum
                         <button onClick={() => setShowHelpModal(true)} className="text-gray-400 hover:text-gray-600">
-                            <InformationCircleIcon className="w-5 h-5" />
+                            <Info className="w-5 h-5" />
                         </button>
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Kelola CPL, Bahan Kajian, MK, CPMK, Sub-CPMK</p>
@@ -304,23 +304,23 @@ export default function CurriculumPage() {
                     {/* View Mode Toggle */}
                     {(activeTab === 'cpl' || activeTab === 'cpmk') && (
                         <div className="join bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                            <button onClick={() => setViewMode('table')} className={`join-item btn btn-sm btn-ghost ${viewMode === 'table' ? 'bg-gray-100 dark:bg-gray-700' : ''}`} title="Table View"><TableCellsIcon className="w-4 h-4" /></button>
-                            <button onClick={() => setViewMode('list')} className={`join-item btn btn-sm btn-ghost ${viewMode === 'list' ? 'bg-gray-100 dark:bg-gray-700' : ''}`} title="List View"><ListBulletIcon className="w-4 h-4" /></button>
-                            <button onClick={() => setViewMode('card')} className={`join-item btn btn-sm btn-ghost ${viewMode === 'card' ? 'bg-gray-100 dark:bg-gray-700' : ''}`} title="Card View"><Squares2X2Icon className="w-4 h-4" /></button>
+                            <button onClick={() => setViewMode('table')} className={`join-item btn btn-sm btn-ghost ${viewMode === 'table' ? 'bg-gray-100 dark:bg-gray-700' : ''}`} title="Table View"><Table className="w-4 h-4" /></button>
+                            <button onClick={() => setViewMode('list')} className={`join-item btn btn-sm btn-ghost ${viewMode === 'list' ? 'bg-gray-100 dark:bg-gray-700' : ''}`} title="List View"><List className="w-4 h-4" /></button>
+                            <button onClick={() => setViewMode('card')} className={`join-item btn btn-sm btn-ghost ${viewMode === 'card' ? 'bg-gray-100 dark:bg-gray-700' : ''}`} title="Card View"><LayoutGrid className="w-4 h-4" /></button>
                         </div>
                     )}
 
                     {/* Batch Delete */}
                     {selectedItems.length > 0 && (
                         <button onClick={handleBatchDelete} className="btn btn-error btn-sm flex items-center gap-1">
-                            <TrashIcon className="w-4 h-4" /> Hapus ({selectedItems.length})
+                            <Trash2 className="w-4 h-4" /> Hapus ({selectedItems.length})
                         </button>
                     )}
 
                     {/* Import Wrapper */}
                     <div className="dropdown dropdown-end">
                         <label tabIndex={0} className="btn btn-outline btn-sm gap-2">
-                            <ArrowDownTrayIcon className="w-4 h-4" /> Import
+                            <FileDown className="w-4 h-4" /> Import
                         </label>
                         <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 z-[1]">
                             <li><button onClick={() => handleOpenImport('cpl')}>Import CPL</button></li>
@@ -362,7 +362,7 @@ export default function CurriculumPage() {
                         {/* CPL CONTENT */}
                         {activeTab === 'cpl' && (
                             <div className="space-y-4">
-                                <div className="flex justify-end"><button onClick={handleAddCPL} className="btn btn-primary btn-sm"><PlusIcon className="w-4 h-4" /> Tambah CPL</button></div>
+                                <div className="flex justify-end"><button onClick={handleAddCPL} className="btn btn-primary btn-sm"><Plus className="w-4 h-4" /> Tambah CPL</button></div>
                                 {viewMode === 'table' ? (
                                     <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                                         <table className="table w-full">
@@ -478,7 +478,7 @@ export default function CurriculumPage() {
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
                                     <div className="text-xs text-gray-500">Pilih item untuk hapus massal (checkbox).</div>
-                                    <button onClick={handleAddCPMK} className="btn btn-primary btn-sm"><PlusIcon className="w-4 h-4" /> Tambah CPMK</button>
+                                    <button onClick={handleAddCPMK} className="btn btn-primary btn-sm"><Plus className="w-4 h-4" /> Tambah CPMK</button>
                                 </div>
                                 <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                                     <table className="table w-full">
@@ -523,7 +523,7 @@ export default function CurriculumPage() {
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
                                     <div className="text-xs text-gray-500">Pilih item untuk hapus massal.</div>
-                                    <button onClick={handleAddSubCPMK} className="btn btn-primary btn-sm"><PlusIcon className="w-4 h-4" /> Tambah Sub-CPMK</button>
+                                    <button onClick={handleAddSubCPMK} className="btn btn-primary btn-sm"><Plus className="w-4 h-4" /> Tambah Sub-CPMK</button>
                                 </div>
                                 <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
                                     <table className="table w-full">
