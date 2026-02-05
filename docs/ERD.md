@@ -19,6 +19,7 @@ erDiagram
     users ||--o{ student_grade : "grades"
     users ||--o{ final_grade : "approves"
     users ||--o{ rps : "reviews"
+    users ||--o{ notifications : "receives"
     
     fakultas ||--o{ prodi : "contains"
     
@@ -299,6 +300,26 @@ erDiagram
         decimal final_ip
         timestamp created_at
         timestamp updated_at
+    }
+
+    academic_years {
+        int id PK
+        string name UK
+        bool is_active
+        enum active_semester
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    notifications {
+        int id PK
+        int user_id FK
+        string title
+        text message
+        enum type
+        bool is_read
+        string link
+        timestamp created_at
     }
 ```
 

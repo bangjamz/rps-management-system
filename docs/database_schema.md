@@ -442,6 +442,41 @@ Student course enrollment/registration.
 
 ---
 
+
+### 7. System Configuration & Utilities
+
+#### `academic_years`
+Academic year configuration.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | INTEGER | PK, AUTO_INCREMENT | ID |
+| name | VARCHAR(20) | NOT NULL, UNIQUE | Name (e.g., 2025/2026) |
+| is_active | BOOLEAN | DEFAULT false | Active flag |
+| active_semester | ENUM | | Ganjil/Genap |
+| created_at | TIMESTAMP | | |
+| updated_at | TIMESTAMP | | |
+
+---
+
+#### `notifications`
+User notifications.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | INTEGER | PK, AUTO_INCREMENT | ID |
+| user_id | INTEGER | FK → users(id), NOT NULL | Recipient |
+| title | VARCHAR(255) | NOT NULL | Title |
+| message | TEXT | NOT NULL | Body |
+| type | ENUM | DEFAULT 'info' | info/warning/success/error |
+| is_read | BOOLEAN | DEFAULT false | Read status |
+| link | VARCHAR(255) | | Action link |
+| created_at | TIMESTAMP | | |
+
+**Indexes:** `user_id`, `is_read`
+
+---
+
 ## 🔗 Key Relationships
 
 ### Many-to-Many Relationships
@@ -485,7 +520,7 @@ Student course enrollment/registration.
 - Curriculum: 3 (cpl, cpmk, sub_cpmk)
 - Academic: 4 (mata_kuliah, rps, rps_pertemuan, penilaian_mk)
 - Grading: 6 (grading_system, grade_scale, grade_scale_detail, assessment_component, student_grade, final_grade)
-- Operations: 3 (attendance, enrollment, dosen_assignment, cpl_mk)
+- Operations: 5 (attendance, enrollment, dosen_assignment, cpl_mk, notifications, academic_years)
 
 **Total Foreign Keys:** 45+
 

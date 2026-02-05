@@ -271,6 +271,28 @@ classDiagram
         +calculate() void
         +approve(userId) void
     }
+
+    class AcademicYear {
+        +int id
+        +string name
+        +bool is_active
+        +enum active_semester
+        +Date createdAt
+        +Date updatedAt
+        +setCurrent() Promise
+    }
+
+    class Notification {
+        +int id
+        +int user_id
+        +string title
+        +text message
+        +enum type
+        +bool is_read
+        +string link
+        +Date createdAt
+        +markAsRead() Promise
+    }
     
     %% ========== ATTENDANCE ==========
     
@@ -312,6 +334,7 @@ classDiagram
     
     User "1" --> "0..1" Mahasiswa : has profile
     User "1" --> "0..1" Dosen : has profile
+    User "1" --> "*" Notification : receives
     
     Fakultas "1" --> "*" Prodi : contains
     
