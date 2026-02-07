@@ -83,7 +83,7 @@ export const generateRPSPDF = (rpsData) => {
         startY: yPos,
         head: [['Minggu', 'Sub-CPMK', 'Materi', 'Metode', 'Waktu', 'Penilaian']],
         body: rpsData.meetings.map(meeting => [
-            meeting.minggu_ke,
+            meeting.sampai_minggu_ke ? `${meeting.minggu_ke}-${meeting.sampai_minggu_ke}` : meeting.minggu_ke,
             meeting.sub_cpmk || '-',
             meeting.materi_pembelajaran || '-',
             meeting.metode_pembelajaran || '-',
@@ -91,16 +91,29 @@ export const generateRPSPDF = (rpsData) => {
             meeting.penilaian || '-'
         ]),
         theme: 'grid',
-        headStyles: { fillColor: [63, 81, 181], fontSize: 8 },
-        bodyStyles: { fontSize: 8 },
+        headStyles: {
+            fillColor: [63, 81, 181],
+            fontSize: 8,
+            valign: 'middle',
+            halign: 'center',
+            lineWidth: 0.1,
+            lineColor: [200, 200, 200]
+        },
+        bodyStyles: {
+            fontSize: 8,
+            valign: 'top'
+        },
         margin: { left: 15, right: 15 },
         columnStyles: {
-            0: { cellWidth: 15 },
-            1: { cellWidth: 25 },
-            2: { cellWidth: 50 },
-            3: { cellWidth: 30 },
-            4: { cellWidth: 20 },
-            5: { cellWidth: 30 }
+            0: { cellWidth: 15, halign: 'center' },
+            1: { cellWidth: 40 }, // Sub-CPMK
+            2: { cellWidth: 35 }, // Materi
+            3: { cellWidth: 30 }, // Metode
+            4: { cellWidth: 20, halign: 'center' }, // Waktu
+            5: { cellWidth: 30 }  // Penilaian
+        },
+        didParseCell: function (data) {
+            // Apply word wrap explicitly if needed, but autoTable does it by default with cellWidth
         }
     });
 

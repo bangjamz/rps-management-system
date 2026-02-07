@@ -5,7 +5,10 @@ import {
     getAvailableLecturers,
     createAssignment,
     updateAssignment,
-    deleteAssignment
+    deleteAssignment,
+    updateDosen,
+    createDosen,
+    deleteDosen
 } from '../controllers/lecturerAssignmentController.js';
 
 const router = express.Router();
@@ -23,5 +26,10 @@ router.get('/available-lecturers', canAssignLecturers, getAvailableLecturers);
 router.post('/', canAssignLecturers, createAssignment);
 router.put('/:id', canAssignLecturers, updateAssignment);
 router.delete('/:id', canAssignLecturers, deleteAssignment);
+
+// Dosen CRUD operations (kaprodi/dekan/admin only)
+router.post('/dosen', canAssignLecturers, createDosen);
+router.put('/dosen/:id', canAssignLecturers, updateDosen);
+router.delete('/dosen/:id', canAssignLecturers, deleteDosen);
 
 export default router;

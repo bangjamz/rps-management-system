@@ -1,144 +1,343 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import useAuthStore from '../store/useAuthStore';
-import { User, Mail, Phone, Briefcase, MapPin, Hash, Award, Camera, Image as ImageIcon, Palette } from 'lucide-react';
+import { User, Mail, Phone, Briefcase, MapPin, Hash, Award, Camera, Image as ImageIcon, Palette, Search, Upload, X, Check, Loader2 } from 'lucide-react';
+import { getTagColor } from '../utils/ui';
 import axios from '../lib/axios';
 
-const COVERS = [
+// Expanded color/gradient options
+const SOLID_COLORS = [
+    'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500',
+    'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500',
+    'bg-blue-500', 'bg-indigo-500', 'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500',
+    'bg-pink-500', 'bg-rose-500', 'bg-slate-500', 'bg-gray-500', 'bg-zinc-700',
+];
+
+const GRADIENTS = [
     'bg-gradient-to-r from-primary-700 to-primary-500',
     'bg-gradient-to-r from-blue-700 to-cyan-500',
     'bg-gradient-to-r from-emerald-700 to-teal-500',
     'bg-gradient-to-r from-orange-700 to-amber-500',
     'bg-gradient-to-r from-purple-700 to-pink-500',
     'bg-gradient-to-r from-slate-800 to-slate-600',
+    'bg-gradient-to-r from-rose-500 to-orange-400',
+    'bg-gradient-to-r from-violet-600 to-indigo-600',
+    'bg-gradient-to-r from-cyan-500 to-blue-500',
+    'bg-gradient-to-r from-green-400 to-cyan-500',
+];
+
+// Sample Unsplash images for quick selection
+const UNSPLASH_PRESETS = [
+    'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&q=80&w=1200',
+    'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&q=80&w=1200',
+    'https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&q=80&w=1200',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=1200',
+    'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&q=80&w=1200',
+    'https://images.unsplash.com/photo-1475924156734-496f6cac6ec1?auto=format&fit=crop&q=80&w=1200',
 ];
 
 const ProfilePage = () => {
     const { user, checkAuth } = useAuthStore();
     const [isHoveringCover, setIsHoveringCover] = useState(false);
     const [showCoverMenu, setShowCoverMenu] = useState(false);
+    const [activeTab, setActiveTab] = useState('colors'); // colors, unsplash, upload
     const [loading, setLoading] = useState(false);
+    const [unsplashQuery, setUnsplashQuery] = useState('');
+    const [unsplashResults, setUnsplashResults] = useState([]);
+    const [searchingUnsplash, setSearchingUnsplash] = useState(false);
+    const [coverImage, setCoverImage] = useState(user?.cover_image || null);
+    const fileInputRef = useRef(null);
+    const menuRef = useRef(null);
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (menuRef.current && !menuRef.current.contains(event.target)) {
+                setShowCoverMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     if (!user) return null;
 
     const handleUpdateCover = async (coverValue) => {
         try {
             setLoading(true);
-            // Assuming we have an endpoint to update profile
-            // If not, we might need to create one or use existing update user endpoint
-            // For now, let's assume /auth/profile/update or similar. 
-            // If not existing, I will check user routes. 
-            // Checking: We have 'Login', 'Me', etc. Usually Update Profile is common.
-            // If not, I'll fallback to just local state update for demo or implement it.
-            // Let's try to update via /auth/profile if it accepts PUT, otherwise we might fail.
-            // I'll assume we can handle it or I'll implement it in server.
+            setCoverImage(coverValue);
 
-            // Wait, I haven't implemented update profile endpoint yet?
-            // User.js model updated.
-            // I need to ensure backend supports update.
-            // I'll stick to UI implementation first.
+            // Update via API
+            await axios.put('/auth/profile', { cover_image: coverValue });
+            await checkAuth(); // Refresh user data
 
-            // Simulating update for now if endpoint missing, but ideally:
-            // await axios.put('/auth/profile', { cover_image: coverValue });
-            // checkAuth(); // Refresh user
-
-            // Since I cannot verify endpoint existence without reading routes again (I recall /auth/me or similar),
-            // I will implement the UI and assuming the backend part for update might be needed.
-            // User request is "Change Cover".
-
-            console.log("Updating cover to:", coverValue);
-            // Mocking for UI feedback
-            user.cover_image = coverValue;
             setShowCoverMenu(false);
         } catch (error) {
-            console.error(error);
+            console.error('Failed to update cover:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSearchUnsplash = async () => {
+        if (!unsplashQuery.trim()) return;
+
+        setSearchingUnsplash(true);
+        try {
+            // Using Unsplash Source for simple random images by query
+            // In production, use Unsplash API with proper key
+            const results = Array.from({ length: 6 }, (_, i) =>
+                `https://source.unsplash.com/1200x400/?${encodeURIComponent(unsplashQuery)}&sig=${Date.now() + i}`
+            );
+            setUnsplashResults(results);
+        } catch (error) {
+            console.error('Unsplash search failed:', error);
+        } finally {
+            setSearchingUnsplash(false);
+        }
+    };
+
+    const handleFileUpload = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file');
+            return;
+        }
+
+        // Convert to base64 for preview and storage
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            handleUpdateCover(reader.result);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveCover = async () => {
+        try {
+            setLoading(true);
+            setCoverImage(null);
+            await axios.put('/auth/profile', { cover_image: null });
+            await checkAuth();
+            setShowCoverMenu(false);
+        } catch (error) {
+            console.error('Failed to remove cover:', error);
         } finally {
             setLoading(false);
         }
     };
 
     // Determine Cover Style
-    const coverStyle = user.cover_image && user.cover_image.startsWith('http')
-        ? { backgroundImage: `url(${user.cover_image})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    const currentCover = coverImage || user.cover_image;
+    const isImageUrl = currentCover && (currentCover.startsWith('http') || currentCover.startsWith('data:'));
+
+    const coverStyle = isImageUrl
+        ? { backgroundImage: `url(${currentCover})`, backgroundSize: 'cover', backgroundPosition: 'center' }
         : {};
 
-    const coverClass = user.cover_image && !user.cover_image.startsWith('http')
-        ? user.cover_image
-        : (!user.cover_image ? COVERS[0] : 'bg-gray-200');
+    const coverClass = !isImageUrl && currentCover
+        ? currentCover
+        : (!currentCover ? GRADIENTS[0] : '');
 
     return (
         <div className="p-6 max-w-4xl mx-auto mb-20">
             {/* Cover Area */}
             <div
-                className={`group relative h-48 w-full rounded-b-xl shadow-sm overflow-hidden transition-all duration-300 ${coverClass}`}
+                className={`group relative h-48 w-full rounded-xl shadow-lg overflow-visible transition-all duration-300 ${coverClass}`}
                 style={coverStyle}
                 onMouseEnter={() => setIsHoveringCover(true)}
                 onMouseLeave={() => setIsHoveringCover(false)}
             >
+                {/* Overlay for better text visibility on images */}
+                {isImageUrl && <div className="absolute inset-0 bg-black/10" />}
+
                 {/* Change Cover Button */}
-                {isHoveringCover && (
-                    <div className="absolute top-4 right-4 animate-fade-in">
+                <div className={`absolute top-4 right-4 transition-opacity duration-200 ${isHoveringCover ? 'opacity-100' : 'opacity-0'}`}>
+                    <div ref={menuRef} className="relative">
                         <button
                             onClick={() => setShowCoverMenu(!showCoverMenu)}
-                            className="btn btn-sm btn-ghost bg-black/30 text-white hover:bg-black/50 backdrop-blur-sm gap-2"
+                            className="btn btn-sm bg-black/40 text-white hover:bg-black/60 backdrop-blur-sm border-0 gap-2 shadow-lg"
                         >
                             <ImageIcon className="w-4 h-4" /> Ubah Cover
                         </button>
 
                         {showCoverMenu && (
-                            <div className="absolute top-10 right-0 bg-white dark:bg-gray-800 shadow-xl rounded-lg p-3 w-64 z-50 border border-gray-200 dark:border-gray-700">
-                                <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Pilih Warna / Gradient</h4>
-                                <div className="grid grid-cols-5 gap-2 mb-3">
-                                    {COVERS.map((c, i) => (
-                                        <button
-                                            key={i}
-                                            className={`w-8 h-8 rounded-full ${c} border-2 border-transparent hover:border-gray-400`}
-                                            onClick={() => handleUpdateCover(c)}
-                                        />
-                                    ))}
-                                </div>
-                                <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
+                            <div className="absolute top-12 right-0 bg-white dark:bg-gray-800 shadow-2xl rounded-xl p-4 w-80 z-50 border border-gray-200 dark:border-gray-700 animate-fade-in">
+                                {/* Tabs */}
+                                <div className="flex gap-1 mb-4 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
                                     <button
-                                        onClick={() => handleUpdateCover('https://images.unsplash.com/photo-1542435503-956c469947f6?auto=format&fit=crop&q=80&w=1000')}
-                                        className="btn btn-xs btn-outline w-full mb-1"
+                                        onClick={() => setActiveTab('colors')}
+                                        className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all ${activeTab === 'colors'
+                                            ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-900 dark:text-white'
+                                            : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                            }`}
                                     >
-                                        Random Unsplash
+                                        <Palette className="w-3 h-3 inline mr-1" /> Warna
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('unsplash')}
+                                        className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all ${activeTab === 'unsplash'
+                                            ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-900 dark:text-white'
+                                            : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                            }`}
+                                    >
+                                        <Search className="w-3 h-3 inline mr-1" /> Unsplash
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('upload')}
+                                        className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all ${activeTab === 'upload'
+                                            ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-900 dark:text-white'
+                                            : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                            }`}
+                                    >
+                                        <Upload className="w-3 h-3 inline mr-1" /> Upload
                                     </button>
                                 </div>
+
+                                {/* Colors Tab */}
+                                {activeTab === 'colors' && (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Warna Solid</h4>
+                                            <div className="grid grid-cols-10 gap-1.5">
+                                                {SOLID_COLORS.map((c, i) => (
+                                                    <button
+                                                        key={i}
+                                                        className={`w-6 h-6 rounded-md ${c} border-2 border-transparent hover:border-gray-400 hover:scale-110 transition-transform`}
+                                                        onClick={() => handleUpdateCover(c)}
+                                                        disabled={loading}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Gradient</h4>
+                                            <div className="grid grid-cols-5 gap-2">
+                                                {GRADIENTS.map((c, i) => (
+                                                    <button
+                                                        key={i}
+                                                        className={`w-full h-8 rounded-lg ${c} border-2 border-transparent hover:border-gray-400 hover:scale-105 transition-transform`}
+                                                        onClick={() => handleUpdateCover(c)}
+                                                        disabled={loading}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Unsplash Tab */}
+                                {activeTab === 'unsplash' && (
+                                    <div className="space-y-3">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Cari gambar..."
+                                                value={unsplashQuery}
+                                                onChange={(e) => setUnsplashQuery(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleSearchUnsplash()}
+                                                className="input input-sm input-bordered flex-1 text-sm"
+                                            />
+                                            <button
+                                                onClick={handleSearchUnsplash}
+                                                className="btn btn-sm btn-primary"
+                                                disabled={searchingUnsplash}
+                                            >
+                                                {searchingUnsplash ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+
+                                        <div>
+                                            <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">
+                                                {unsplashResults.length > 0 ? 'Hasil Pencarian' : 'Pilihan Populer'}
+                                            </h4>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {(unsplashResults.length > 0 ? unsplashResults : UNSPLASH_PRESETS).map((url, i) => (
+                                                    <button
+                                                        key={i}
+                                                        onClick={() => handleUpdateCover(url)}
+                                                        className="aspect-video rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all hover:scale-105"
+                                                        disabled={loading}
+                                                    >
+                                                        <img src={url} alt="" className="w-full h-full object-cover" />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Upload Tab */}
+                                {activeTab === 'upload' && (
+                                    <div className="space-y-3">
+                                        <div
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                                        >
+                                            <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">Klik untuk upload gambar</p>
+                                            <p className="text-xs text-gray-400 mt-1">JPG, PNG, GIF (max 5MB)</p>
+                                        </div>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleFileUpload}
+                                            className="hidden"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Remove Cover Option */}
+                                {currentCover && (
+                                    <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3">
+                                        <button
+                                            onClick={handleRemoveCover}
+                                            className="btn btn-xs btn-ghost text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 w-full"
+                                            disabled={loading}
+                                        >
+                                            <X className="w-3 h-3 mr-1" /> Hapus Cover
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Loading Indicator */}
+                                {loading && (
+                                    <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 rounded-xl flex items-center justify-center">
+                                        <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
-                )}
+                </div>
             </div>
 
-            {/* Profile Header Content */}
+            {/* Profile Header Content - FIXED SPACING */}
             <div className="px-8 max-w-4xl mx-auto">
-                <div className="relative flex flex-col md:flex-row items-end md:items-end -mt-16 mb-8 gap-6">
+                <div className="relative flex flex-col md:flex-row items-start md:items-end -mt-16 pt-4 mb-8 gap-6">
                     {/* Avatar */}
-                    <div className="relative group">
-                        <div className="w-32 h-32 rounded-full border-4 border-white dark:border-gray-900 bg-white dark:bg-gray-700 overflow-hidden shadow-md flex items-center justify-center">
+                    <div className="relative group flex-shrink-0">
+                        <div className="w-32 h-32 rounded-full border-4 border-white dark:border-gray-900 bg-white dark:bg-gray-700 overflow-hidden shadow-lg flex items-center justify-center">
                             {user.foto_profil ? (
                                 <img src={user.foto_profil} alt={user.nama_lengkap} className="w-full h-full object-cover" />
                             ) : (
                                 <User className="w-16 h-16 text-gray-400" />
                             )}
                         </div>
-                        {/* Edit Avatar Overlay (Optional) */}
-                        {/* <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                            <Camera className="w-8 h-8 text-white" />
-                        </div> */}
                     </div>
 
-                    {/* Name & Role */}
-                    <div className="mb-2 flex-1">
+                    {/* Name & Role - INCREASED TOP SPACING */}
+                    <div className="flex-1 pt-20 md:pt-0 md:pb-2">
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white leading-tight">{user.nama_lengkap}</h1>
-                        <p className="text-lg text-gray-500 dark:text-gray-400 font-medium capitalize flex items-center gap-2">
+                        <p className="text-lg text-gray-500 dark:text-gray-400 font-medium capitalize flex items-center gap-2 mt-1">
                             {user.role}
-                            {user.is_active && <span className="w-2 h-2 bg-green-500 rounded-full" title="Active"></span>}
+                            {user.is_active && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Active"></span>}
                         </p>
                     </div>
 
-                    {/* Action Buttons (Optional) */}
-                    <div className="mb-4">
+                    {/* Action Buttons */}
+                    <div className="md:pb-2">
                         {/* <button className="btn btn-outline btn-sm">Edit Profil</button> */}
                     </div>
                 </div>
@@ -183,7 +382,9 @@ const ProfilePage = () => {
                                 {user.homebase && (
                                     <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
                                         <MapPin className="w-4 h-4 text-gray-400" />
-                                        <span>{user.homebase}</span>
+                                        <span className={`${getTagColor('prodi')} px-2 py-0.5 rounded text-[10px] font-bold uppercase border`}>
+                                            {user.homebase}
+                                        </span>
                                     </li>
                                 )}
                             </ul>
@@ -204,7 +405,9 @@ const ProfilePage = () => {
                                 {user.status_kepegawaian && (
                                     <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
                                         <Briefcase className="w-4 h-4 text-gray-400" />
-                                        <span className="badge badge-sm badge-info badge-outline">{user.status_kepegawaian}</span>
+                                        <span className={`${getTagColor(user.status_kepegawaian)} px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider`}>
+                                            {user.status_kepegawaian}
+                                        </span>
                                     </li>
                                 )}
                             </ul>

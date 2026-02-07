@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronRight, BookOpen, Users, Monitor, X, Cloud, CloudOff } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronRight, BookOpen, Users, Monitor, X, Cloud, CloudOff, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { debounce } from 'lodash';
 import axios from '../lib/axios';
 import useAuthStore from '../store/useAuthStore';
@@ -17,6 +17,15 @@ export default function RPSEditorPage() {
     const [activeSection, setActiveSection] = useState('identitas');
     const [lastSaved, setLastSaved] = useState(null);
 
+    // Constants for selection
+    const teknikPenilaian = [
+        'Tes Tertulis', 'Tes Lisan', 'Penilaian Kinerja', 'Penilaian Proyek', 'Penilaian Portofolio', 'Observasi'
+    ];
+
+    const metodePembelajaran = [
+        'Ceramah', 'Diskusi', 'Presentasi', 'Praktikum', 'Problem Based Learning', 'Project Based Learning', 'Inquiry'
+    ];
+
     // --- State: Identitas MK ---
     const [courses, setCourses] = useState([]);
     const [formData, setFormData] = useState({
@@ -30,8 +39,18 @@ export default function RPSEditorPage() {
         rumpun_mk: '',
         sks: '',
         pengembang_rps: user?.nama_lengkap || '',
-        ketua_prodi: ''
+        koordinator_rumpun_mk: '',
+        ketua_prodi: '',
+        pustaka_utama: '',
+        pustaka_pendukung: '',
+        media_software: '',
+        media_hardware: '',
+        mk_syarat: '',
+        ambang_batas_mhs: '',
+        ambang_batas_mk: ''
     });
+
+    const [dosen_pengampu_list, setDosenPengampuList] = useState([]);
 
     // Rumpun MK options with add-new capability
     const [rumpunOptions, setRumpunOptions] = useState([
@@ -39,6 +58,10 @@ export default function RPSEditorPage() {
         'Sistem Informasi', 'Multimedia', 'Keamanan Siber', 'Matematika', 'Umum'
     ]);
     const [showNewRumpun, setShowNewRumpun] = useState(false);
+
+    // --- State: Sub-CPMK Management (Phase 24) ---
+    // Enriched definedSubCPMKs withestimasi_minggu
+    // Handled in existing state: definedSubCPMKs
     const [newRumpunValue, setNewRumpunValue] = useState('');
 
     // --- State: Capaian Pembelajaran ---
@@ -47,7 +70,15 @@ export default function RPSEditorPage() {
     const [selectedCPMKs, setSelectedCPMKs] = useState([]); // Array of IDs linked to this RPS
     const [activeCpl, setActiveCpl] = useState(null); // ID for expanding UI to add new CPMK
     const [newCpmk, setNewCpmk] = useState({ kode: '', deskripsi: '' });
-    const [newSubCpmk, setNewSubCpmk] = useState({ kode: '', deskripsi: '' });
+    const [newSubCpmk, setNewSubCpmk] = useState({ kode: '', deskripsi: '', cpmk_id: '' });
+    const [definedSubCPMKs, setDefinedSubCPMKs] = useState([]);
+    const [resolvedCPMKs, setResolvedCPMKs] = useState([]); // Full CPMK objects from backend
+    const [resolvedCPLs, setResolvedCPLs] = useState([]); // Full CPL objects from backend
+    // --- State: Metode Penilaian ---
+    const [metodePenilaian, setMetodePenilaian] = useState([]);
+    const [assessmentTypes, setAssessmentTypes] = useState([
+        'Rubrik', 'Portofolio', 'Tes Tertulis', 'Tes Lisan', 'Observasi', 'Partisipasi'
+    ]);
 
     // --- State: Weekly Schedule ---
     const [rows, setRows] = useState([]);
@@ -60,18 +91,17 @@ export default function RPSEditorPage() {
     useEffect(() => {
         const savedDraft = localStorage.getItem(DRAFT_KEY);
         if (savedDraft && !rpsId) {
-            // Only auto-load for new RPS if a draft exists
-            // For existing RPS, we prioritize server data, but maybe show a banner?
             try {
                 const parsed = JSON.parse(savedDraft);
                 const confirmLoad = window.confirm('Ditemukan draft RPS yang belum disimpan. Apakah Anda ingin melanjutkannya?');
                 if (confirmLoad) {
                     setFormData(parsed.formData);
-                    // rows need recreation of logic/ids if needed, but simple set works
                     setRows(parsed.rows || []);
                     setSelectedCPLs(parsed.selectedCPLs || []);
                     setSelectedCPMKs(parsed.selectedCPMKs || []);
                     setDefinedSubCPMKs(parsed.definedSubCPMKs || []);
+                    setMetodePenilaian(parsed.metodePenilaian || []);
+                    if (parsed.dosen_pengampu_list) setDosenPengampuList(parsed.dosen_pengampu_list);
                     console.log('Draft loaded');
                 }
             } catch (e) {
@@ -89,7 +119,12 @@ export default function RPSEditorPage() {
                     rows,
                     selectedCPLs,
                     selectedCPMKs,
-                    definedSubCPMKs,
+                    selectedCPMKs,
+                    selectedCPMKs,
+                    definedSubCPMKs, // Now includes estimasi_minggu and acts as ordered list
+                    metodePenilaian,
+                    metodePenilaian,
+                    dosen_pengampu_list,
                     updatedAt: new Date().toISOString()
                 };
                 localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
@@ -99,7 +134,7 @@ export default function RPSEditorPage() {
 
         saveToLocal();
         return () => saveToLocal.cancel();
-    }, [formData, rows, selectedCPLs, selectedCPMKs, definedSubCPMKs, DRAFT_KEY]);
+    }, [formData, rows, selectedCPLs, selectedCPMKs, definedSubCPMKs, dosen_pengampu_list, DRAFT_KEY]);
 
     // --- Data Fetching & Effects ---
     useEffect(() => {
@@ -118,21 +153,42 @@ export default function RPSEditorPage() {
     }, [activeSemester, activeYear, rpsId]);
 
     useEffect(() => {
+        // Parse courseId from URL query params OR location.state
+        const searchParams = new URLSearchParams(location.search);
+        const urlCourseId = searchParams.get('courseId');
+
         if (rpsId) {
             fetchExistingRPS();
+        } else if (urlCourseId && courses.length > 0) {
+            // Auto-select course from query param
+            const course = courses.find(c => c.id === parseInt(urlCourseId));
+            if (course) {
+                setFormData(prev => ({
+                    ...prev,
+                    mata_kuliah_id: course.id,
+                    kode_mk: course.kode_mk || '',
+                    nama_mk: course.nama_mk || '',
+                    sks: course.sks || '',
+                    rumpun_mk: course.rumpun_mk || ''
+                }));
+                if (course.prodi_id) {
+                    fetchCPLs(course.prodi_id, course.id);
+                }
+                if (rows.length === 0) initializeRows(14);
+            }
         } else if (location.state?.courseId) {
             handleCoursePreselect(location.state);
         } else if (rows.length === 0) {
             initializeRows(14);
         }
-    }, [rpsId, location.state]);
+    }, [rpsId, location.state, location.search, courses]);
 
-    // Fetch CPLs when course is selected
+    // Fetch CPLs when course is selected (moved logic into selection effect for efficiency)
     useEffect(() => {
-        if (formData.mata_kuliah_id) {
+        if (formData.mata_kuliah_id && courses.length > 0) {
             const course = courses.find(c => c.id === parseInt(formData.mata_kuliah_id));
             if (course?.prodi_id) {
-                fetchCPLs(course.prodi_id);
+                fetchCPLs(course.prodi_id, course.id);
             }
         }
     }, [formData.mata_kuliah_id, courses]);
@@ -170,6 +226,15 @@ export default function RPSEditorPage() {
             nama_mk: state.nama_mk || '',
             sks: state.sks || ''
         }));
+        // Populate Dosen if available
+        if (state.assignments && Array.isArray(state.assignments)) {
+            const dosenNames = state.assignments.map(a => a.dosen?.nama_lengkap).filter(Boolean);
+            if (dosenNames.length > 0) setDosenPengampuList(dosenNames);
+        } else if (state.dosen_pengampu_list) {
+            // Fallback if passed in state
+            setDosenPengampuList(state.dosen_pengampu_list);
+        }
+
         if (state.prodi_id) {
             fetchCPLs(state.prodi_id, state.courseId);
         }
@@ -187,11 +252,35 @@ export default function RPSEditorPage() {
                 nama_mk: course.nama_mk,
                 sks: course.sks
             }));
+
+            // Auto-populate Dosen from Course Assignments
+            if (course.assignments && Array.isArray(course.assignments)) {
+                const dosenNames = course.assignments.map(a => a.dosen?.nama_lengkap).filter(Boolean);
+                if (dosenNames.length > 0) setDosenPengampuList(dosenNames);
+            }
+
             if (course.prodi_id) {
                 fetchCPLs(course.prodi_id, courseId);
             }
             if (rows.length === 0) initializeRows(14);
         }
+    };
+
+    // Helper to safely parse array fields from backend (handling strings, JSON strings, arrays)
+    const parseArrayField = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        try {
+            // Try parsing if it looks like a JSON array
+            if (typeof value === 'string' && (value.startsWith('[') || value.startsWith('"'))) {
+                const parsed = JSON.parse(value);
+                if (Array.isArray(parsed)) return parsed.flat(); // Flatten in case of ["[]"]
+                return [parsed];
+            }
+        } catch (e) {
+            // If parse fails, treat as simple string
+        }
+        return [value];
     };
 
     const fetchExistingRPS = async () => {
@@ -210,10 +299,46 @@ export default function RPSEditorPage() {
                 rumpun_mk: rps.rumpun_mk || '',
                 sks: rps.MataKuliah?.sks || '',
                 pengembang_rps: rps.pengembang_rps || user?.nama_lengkap || '',
-                ketua_prodi: rps.ketua_prodi || ''
+                koordinator_rumpun_mk: rps.koordinator_rumpun_mk || '',
+                ketua_prodi: rps.ketua_prodi || '',
+                pustaka_utama: rps.pustaka_utama || '',
+                pustaka_pendukung: rps.pustaka_pendukung || '',
+                media_software: rps.media_software || '',
+                media_hardware: rps.media_hardware || '',
+                mk_syarat: rps.mk_syarat || '',
+                ambang_batas_mhs: rps.ambang_batas_mhs || '',
+                ambang_batas_mk: rps.ambang_batas_mk || '',
+                status: rps.status || 'draft'
             });
+
+            if (rps.dosen_pengampu_list) {
+                setDosenPengampuList(rps.dosen_pengampu_list);
+            }
+            if (rps.cpl_ids) setSelectedCPLs(rps.cpl_ids);
+            if (rps.cpmk_ids) setSelectedCPMKs(rps.cpmk_ids);
+            if (rps.cpl) setResolvedCPLs(rps.cpl);
+            if (rps.cpmk) setResolvedCPMKs(rps.cpmk);
+
             if (rps.sub_cpmk_list) {
-                setDefinedSubCPMKs(rps.sub_cpmk_list);
+                // Ensure estimasi_minggu exists and handle potential string data
+                let subList = rps.sub_cpmk_list;
+                if (typeof subList === 'string') {
+                    try { subList = JSON.parse(subList); } catch (e) { subList = []; }
+                }
+                if (Array.isArray(subList)) {
+                    const mappedSubs = subList.map(s => ({
+                        ...s,
+                        estimasi_minggu: s.estimasi_minggu || 1
+                    }));
+                    setDefinedSubCPMKs(mappedSubs);
+                }
+            }
+            if (rps.metode_penilaian) {
+                let mp = rps.metode_penilaian;
+                if (typeof mp === 'string') {
+                    try { mp = JSON.parse(mp); } catch (e) { mp = []; }
+                }
+                setMetodePenilaian(Array.isArray(mp) ? mp : []);
             }
             setCurrentRPSId(rps.id);
             if (rps.pertemuan && rps.pertemuan.length > 0) {
@@ -223,15 +348,16 @@ export default function RPSEditorPage() {
                     cpmk_id: p.cpmk_id || '',
                     sub_cpmk_id: p.sub_cpmk_id || '', // Ensure ID is loaded
                     indikator: p.indikator || '',
-                    teknik_penilaian: Array.isArray(p.teknik_penilaian) ? p.teknik_penilaian : (p.teknik_penilaian ? [p.teknik_penilaian] : []),
+                    teknik_penilaian: parseArrayField(p.teknik_penilaian),
                     kriteria_penilaian: p.kriteria_penilaian || '',
                     materi: p.materi || '',
-                    metode_pembelajaran: Array.isArray(p.metode_pembelajaran) ? p.metode_pembelajaran : (p.metode_pembelajaran ? [p.metode_pembelajaran] : []),
-                    bentuk_pembelajaran: Array.isArray(p.bentuk_pembelajaran) ? p.bentuk_pembelajaran : [],
+                    metode_pembelajaran: parseArrayField(p.metode_pembelajaran),
+                    bentuk_pembelajaran: parseArrayField(p.bentuk_pembelajaran),
                     link_daring: p.link_daring || '',
-                    bobot_penilaian: p.bobot_penilaian || '',
-                    is_uts: p.minggu_ke === 8,
-                    is_uas: p.minggu_ke === 15
+                    bobot_penilaian: p.bobot_penilaian || 0,
+                    bobot_penilaian: p.bobot_penilaian || 0,
+                    is_uts: p.is_uts || p.jenis_pertemuan === 'uts',
+                    is_uas: p.is_uas || p.jenis_pertemuan === 'uas'
                 })));
             } else {
                 initializeRows(14);
@@ -334,6 +460,108 @@ export default function RPSEditorPage() {
         }
     };
 
+
+    const handleAddSubCPMKLocal = () => {
+        if (!newSubCpmk.kode || !newSubCpmk.deskripsi || !newSubCpmk.cpmk_id) return;
+
+        const newSub = {
+            id: 'new_' + Date.now(),
+            kode: newSubCpmk.kode,
+            deskripsi: newSubCpmk.deskripsi,
+            cpmk_id: newSubCpmk.cpmk_id,
+            estimasi_minggu: 1
+        };
+
+        setDefinedSubCPMKs([...definedSubCPMKs, newSub]);
+        setNewSubCpmk({ kode: '', deskripsi: '', cpmk_id: '' });
+    };
+
+
+
+    // Sub-CPMK Reordering & Update
+    const moveSubCPMK = (index, direction) => {
+        const newSubs = [...definedSubCPMKs];
+        if (direction === 'up' && index > 0) {
+            [newSubs[index], newSubs[index - 1]] = [newSubs[index - 1], newSubs[index]];
+        } else if (direction === 'down' && index < newSubs.length - 1) {
+            [newSubs[index], newSubs[index + 1]] = [newSubs[index + 1], newSubs[index]];
+        }
+        setDefinedSubCPMKs(newSubs);
+    };
+
+    const updateSubCPMK = (id, field, value) => {
+        setDefinedSubCPMKs(definedSubCPMKs.map(s => s.id === id ? { ...s, [field]: value } : s));
+    };
+
+    // --- Weekly Plan Generator (Phase 24) ---
+    const generateWeeklyPlan = () => {
+        if (!window.confirm("PERINGATAN: Tindakan ini akan MENGHAPUS seluruh isi Rencana Mingguan yang sudah ada (termasuk isian manual) dan menyusun ulang berdasarkan urutan Sub-CPMK. Lanjutkan?")) {
+            return;
+        }
+
+        const newRows = [];
+        let currentWeek = 1;
+
+        definedSubCPMKs.forEach(sub => {
+            const duration = parseInt(sub.estimasi_minggu) || 1;
+            for (let i = 0; i < duration; i++) {
+                // Check for UTS/UAS weeks and insert if needed
+                if (currentWeek === 8) {
+                    newRows.push({
+                        id: 'uts_auto_' + Date.now(),
+                        minggu_ke: 8,
+                        materi: 'Ujian Tengah Semester',
+                        is_uts: true,
+                        bobot_penilaian: 20
+                    });
+                    currentWeek++;
+                } else if (currentWeek === 16) {
+                    // Wait for end to push UAS usually, but let's handle it linearly
+                }
+
+                newRows.push({
+                    id: `gen_${sub.id}_${i}_${Date.now()}`,
+                    minggu_ke: currentWeek,
+                    sub_cpmk_id: sub.id, // Link to Sub-CPMK
+                    cpmk_id: sub.cpmk_id,
+                    indikator: '',
+                    kriteria_penilaian: '',
+                    teknik_penilaian: [],
+                    materi: sub.deskripsi, // Default materi from description
+                    metode_pembelajaran: [],
+                    bentuk_pembelajaran: [],
+                    bobot_penilaian: 5,
+                    link_daring: '',
+                    is_uts: false,
+                    is_uas: false
+                });
+                currentWeek++;
+            }
+        });
+
+        // Add UAS at the end if not reached 16, or at 16
+        if (currentWeek <= 16) {
+            // If we haven't reached week 16, fill distinct weeks or just jump to 16? 
+            // Logic: Append UAS at week 16.
+            newRows.push({
+                id: 'uas_auto_' + Date.now(),
+                minggu_ke: 16,
+                materi: 'Ujian Akhir Semester',
+                is_uas: true,
+                bobot_penilaian: 20
+            });
+        }
+
+        setRows(newRows);
+        setActiveSection('mingguan'); // Auto switch tab to verify
+    };
+
+    const handleDeleteSubCPMK = (id) => {
+        setDefinedSubCPMKs(definedSubCPMKs.filter(s => s.id !== id));
+        // Also clear from rows if used
+        setRows(rows.map(r => r.sub_cpmk_id === id ? { ...r, sub_cpmk_id: '' } : r));
+    };
+
     // --- Row Management ---
     const updateRow = (index, field, value) => {
         const newRows = [...rows];
@@ -355,12 +583,180 @@ export default function RPSEditorPage() {
     const toggleBentukPembelajaran = (index, value) => {
         const newRows = [...rows];
         const current = newRows[index].bentuk_pembelajaran || [];
-        newRows[index].bentuk_pembelajaran = current.includes(value)
-            ? current.filter(v => v !== value)
-            : [...current, value];
-        if (value === 'daring' && !newRows[index].bentuk_pembelajaran.includes('daring')) {
+        if (current.includes(value)) {
+            newRows[index].bentuk_pembelajaran = current.filter(v => v !== value);
+        } else {
+            newRows[index].bentuk_pembelajaran = [...current, value];
+        }
+        // The original code had a condition for 'daring' here, but it was malformed in the instruction.
+        // Assuming the intent was to clear link_daring if 'daring' is removed from bentuk_pembelajaran.
+        // If 'daring' is added, it might set a default link, but the instruction doesn't specify.
+        // For now, I'll keep the original logic for link_daring if 'daring' is removed.
+        if (value === 'D' && !newRows[index].bentuk_pembelajaran.includes('D')) { // Assuming 'D' for Daring
             newRows[index].link_daring = '';
         }
+        setRows(newRows);
+    };
+
+    // --- Generator Logic (Phase 26: Smart Sync) ---
+    const syncWeeklyPlan = () => {
+        // Pool of 'available content rows' from current state that are NOT UTS/UAS
+        let contentRows = rows.filter(r => !r.is_uts && !r.is_uas);
+        let newRows = [];
+        let currentWeek = 1;
+
+        definedSubCPMKs.forEach((sub) => {
+            const duration = parseInt(sub.estimasi_minggu) || 1;
+            let weeksToProcess = duration;
+
+            while (weeksToProcess > 0) {
+                // Insert UTS if we are at week 8
+                if (currentWeek === 8) {
+                    newRows.push({
+                        id: 'uts-' + Date.now() + Math.random(),
+                        minggu_ke: 8,
+                        is_uts: true,
+                        materi: 'EVALUASI TENGAH SEMESTER (ETS) / UTS',
+                        bobot_penilaian: 0
+                    });
+                    currentWeek++;
+                    continue;
+                }
+
+                // Insert UAS if we are at week 16
+                if (currentWeek === 16) {
+                    newRows.push({
+                        id: 'uas-' + Date.now() + Math.random(),
+                        minggu_ke: 16,
+                        is_uas: true,
+                        materi: 'EVALUASI AKHIR SEMESTER (EAS) / UAS',
+                        bobot_penilaian: 0
+                    });
+                    currentWeek++;
+                    continue;
+                }
+
+                // Determine how many weeks we can fit before the next break (UTS or UAS)
+                let nextBreak = (currentWeek < 8) ? 8 : 16;
+                let availableWeeks = nextBreak - currentWeek;
+
+                // If currentWeek is already > 16, let it overflow
+                if (currentWeek > 16) availableWeeks = 99;
+
+                // Take minimum of remaining duration or available weeks before break
+                let weeksTaking = Math.min(weeksToProcess, availableWeeks);
+
+                // Safety check to prevent infinite loop
+                if (weeksTaking <= 0) {
+                    currentWeek++;
+                    continue;
+                }
+
+                const startWeek = currentWeek;
+                const endWeek = currentWeek + weeksTaking - 1;
+
+                // Find existing row to preserve data
+                // We search for a row with matching sub_cpmk_id in the pool
+                const existingRowIndex = contentRows.findIndex(r => String(r.sub_cpmk_id) === String(sub.id));
+                let rowToUse = null;
+
+                if (existingRowIndex >= 0) {
+                    rowToUse = { ...contentRows[existingRowIndex] };
+                    contentRows.splice(existingRowIndex, 1); // Remove from pool
+                } else {
+                    rowToUse = {
+                        id: Date.now() + Math.random(),
+                        indikator: '',
+                        kriteria_penilaian: '',
+                        teknik_penilaian: [],
+                        materi: '',
+                        metode_pembelajaran: [],
+                        bentuk_pembelajaran: [],
+                        link_daring: '',
+                        bobot_penilaian: '',
+                        is_uts: false,
+                        is_uas: false
+                    };
+                }
+
+                rowToUse.minggu_ke = startWeek;
+                rowToUse.sampai_minggu_ke = (weeksTaking > 1) ? endWeek : null;
+                rowToUse.sub_cpmk_id = sub.id;
+                // Update description if it was default
+                rowToUse.sub_cpmk = (!rowToUse.sub_cpmk || rowToUse.sub_cpmk === '-') ? sub.deskripsi : rowToUse.sub_cpmk;
+
+                newRows.push(rowToUse);
+
+                currentWeek += weeksTaking;
+                weeksToProcess -= weeksTaking;
+            }
+        });
+
+        // Add final breaks if we ended exactly before them
+        if (currentWeek === 8) {
+            newRows.push({ id: 'uts-end', minggu_ke: 8, is_uts: true, materi: 'EVALUASI TENGAH SEMESTER (ETS) / UTS', bobot_penilaian: 0 });
+        } else if (currentWeek === 16) {
+            newRows.push({ id: 'uas-end', minggu_ke: 16, is_uas: true, materi: 'EVALUASI AKHIR SEMESTER (EAS) / UAS', bobot_penilaian: 0 });
+        }
+
+        setRows(newRows);
+    };
+
+
+
+    const handleAddUTS = () => {
+        const newRow = {
+            id: 'uts_' + Date.now(),
+            minggu_ke: 8,
+            sub_cpmk_id: '',
+            indikator: '',
+            kriteria_penilaian: '',
+            teknik_penilaian: [],
+            materi: 'Ujian Tengah Semester',
+            metode_pembelajaran: [],
+            bentuk_pembelajaran: [],
+            bobot_penilaian: 20, // default bobot
+            link_daring: '',
+            is_uts: true,
+            is_uas: false
+        };
+        insertRowAt(8, newRow);
+    };
+
+    // Helper to insert row safely
+    const insertRowAt = (weekIndex, rowData) => {
+        const newRows = [...rows];
+        // weekIndex is 1-based usually, but logic here varies. 
+        // Let's assume we want it roughly at array index corresponding to week.
+        // Simple append for now if logic complex, but let's try to splice.
+        // Logic: Find index where minggu_ke > weekIndex
+        let insertIdx = newRows.findIndex(r => r.minggu_ke > weekIndex);
+        if (insertIdx === -1) insertIdx = newRows.length;
+
+        newRows.splice(insertIdx, 0, rowData);
+        // Re-index minggu_ke? No, let them overlap or handle manually?
+        // Better: Just push and sort? For now simple splice.
+        setRows(newRows);
+    };
+
+    const handleAddUAS = () => {
+        const newRow = {
+            id: 'uas_' + Date.now(),
+            minggu_ke: 16,
+            sub_cpmk_id: '',
+            indikator: '',
+            kriteria_penilaian: '',
+            teknik_penilaian: [],
+            materi: 'Ujian Akhir Semester',
+            metode_pembelajaran: [],
+            bentuk_pembelajaran: [],
+            bobot_penilaian: 20, // default bobot
+            link_daring: '',
+            is_uts: false,
+            is_uas: true
+        };
+        const newRows = [...rows];
+        newRows.push(newRow);
         setRows(newRows);
     };
 
@@ -421,11 +817,43 @@ export default function RPSEditorPage() {
             selectedCPLs,
             selectedCPMKs,
             definedSubCPMKs,
+            dosen_pengampu_list,
             updatedAt: new Date().toISOString()
         };
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
         setLastSaved(new Date());
         alert('Draft berhasil disimpan di browser (Local Storage)');
+    };
+
+    const handleSubmitToApproval = async () => {
+        if (!currentRPSId) {
+            alert('Simpan draft ke server terlebih dahulu sebelum diajukan');
+            return;
+        }
+
+        if (!confirm('Apakah Anda yakin ingin mengajukan RPS ini untuk approval? RPS akan terkunci untuk pengeditan.')) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+            // Save current changes first
+            await handleSaveToServer();
+
+            // Submit for approval
+            await axios.put(`/rps/${currentRPSId}/submit`);
+            setFormData(prev => ({ ...prev, status: 'submitted' }));
+            alert('RPS berhasil diajukan untuk approval!');
+
+            // Redirect to management or refresh
+            const basePath = window.location.pathname.includes('/kaprodi/') ? '/kaprodi' : '/dosen';
+            navigate(`${basePath}/rps/${formData.mata_kuliah_id}`);
+        } catch (error) {
+            console.error('Submit failed:', error);
+            alert('Gagal mengajukan RPS: ' + (error.response?.data?.message || error.message));
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSaveToServer = async () => {
@@ -440,7 +868,7 @@ export default function RPSEditorPage() {
             const payload = {
                 ...formData,
                 cpl_ids: selectedCPLs,
-                cpmk_ids: selectedCPMKs // Make sure to send CPMKs too if needed by backend logic (though backend might not use it directly yet)
+                cpmk_ids: selectedCPMKs
             };
 
             let saveId = currentRPSId;
@@ -448,33 +876,52 @@ export default function RPSEditorPage() {
             // If editing existing RPS, update instead of create
             if (currentRPSId) {
                 await axios.put(`/rps/dosen/${currentRPSId}/update`, {
-                    deskripsi_mk: formData.deskripsi_mk,
-                    rumpun_mk: formData.rumpun_mk,
-                    pengembang_rps: formData.pengembang_rps,
-                    koordinator_rumpun_mk: formData.koordinator_rumpun_mk,
-                    ketua_prodi: formData.ketua_prodi,
+                    ...formData,
                     cpl_ids: selectedCPLs,
-                    sub_cpmk_list: definedSubCPMKs // Add Sub-CPMK definitions
+                    cpmk_ids: selectedCPMKs,
+                    sub_cpmk_list: definedSubCPMKs,
+                    metode_penilaian: metodePenilaian,
+                    dosen_pengampu_list
                 });
-                // Note: CPMK links normally saved via bulk or separate endpoint? 
-                // Currently `updateRPS` controller only takes cpl_ids. 
-                // We'll rely on `bulkUpsertPertemuan` to link specific Sub-CPMKs which implies CPMKs.
             } else {
                 // Create new RPS
                 const res = await axios.post('/rps/dosen/create', {
-                    mata_kuliah_id: formData.mata_kuliah_id,
-                    semester: formData.semester,
-                    tahun_ajaran: formData.tahun_ajaran,
-                    deskripsi_mk: formData.deskripsi_mk,
-                    rumpun_mk: formData.rumpun_mk,
-                    pengembang_rps: formData.pengembang_rps,
-                    koordinator_rumpun_mk: formData.koordinator_rumpun_mk,
-                    ketua_prodi: formData.ketua_prodi,
+                    ...formData,
                     cpl_ids: selectedCPLs,
-                    sub_cpmk_list: definedSubCPMKs // Add Sub-CPMK definitions
+                    cpmk_ids: selectedCPMKs,
+                    sub_cpmk_list: definedSubCPMKs,
+                    metode_penilaian: metodePenilaian,
+                    dosen_pengampu_list
                 });
-                saveId = res.data.rps?.id || res.data.id;
-                setCurrentRPSId(saveId);
+
+                // Handle existing RPS response
+                if (res.data.isExisting) {
+                    const confirmEdit = window.confirm(
+                        `RPS untuk MK ini dengan semester dan tahun ajaran yang sama sudah ada (${res.data.rps?.status || 'draft'}). ` +
+                        `Apakah Anda ingin melanjutkan mengedit RPS yang sudah ada?`
+                    );
+                    if (confirmEdit) {
+                        saveId = res.data.rps?.id || res.data.id;
+                        const finalRps = res.data.rps || res.data;
+                        setCurrentRPSId(saveId);
+                        setFormData(prev => ({
+                            ...prev,
+                            status: finalRps.status || 'draft'
+                        }));
+                        alert('RPS yang sudah ada dimuat. Silakan lanjutkan mengedit.');
+                    } else {
+                        setLoading(false);
+                        return; // User cancelled
+                    }
+                } else {
+                    saveId = res.data.rps?.id || res.data.id;
+                    const finalRps = res.data.rps || res.data;
+                    setCurrentRPSId(saveId);
+                    setFormData(prev => ({
+                        ...prev,
+                        status: finalRps.status || 'draft'
+                    }));
+                }
             }
 
             if (rows.length > 0 && saveId) {
@@ -493,7 +940,8 @@ export default function RPSEditorPage() {
         } catch (error) {
             console.error('Save failed:', error);
             const msg = error.response?.data?.message || error.message;
-            alert('Gagal menyimpan RPS: ' + msg);
+            const detailedErr = error.response?.data?.error || '';
+            alert(`Gagal menyimpan RPS: ${msg}\n${detailedErr}`);
         } finally {
             setLoading(false);
         }
@@ -511,12 +959,15 @@ export default function RPSEditorPage() {
     // Calculate total bobot
     const totalBobot = rows.reduce((sum, row) => sum + (parseFloat(row.bobot_penilaian) || 0), 0);
 
-    // Section tabs
+    // Section tabs (Rearranged)
+    // Section tabs (Rearranged)
     const sections = [
-        { id: 'identitas', label: 'Identitas MK', icon: BookOpen },
-        { id: 'cpl', label: 'CPL & CPMK', icon: ChevronRight },
-        { id: 'mingguan', label: 'Rencana Mingguan', icon: Monitor },
-        { id: 'tambahan', label: 'Info Tambahan', icon: Users }
+        { id: 'identitas', label: 'Identitas & Otoritas', icon: BookOpen },
+        { id: 'capaian', label: 'CPL & CPMK', icon: ChevronRight },
+        { id: 'subcpmk', label: 'Sub-CPMK', icon: Users },
+        { id: 'mingguan', label: 'Rencana Mingguan', icon: Monitor }, // Moved below subcpmk
+        { id: 'pustaka', label: 'Pustaka & Media', icon: Users },
+        { id: 'metode_penilaian', label: 'Metode Penilaian', icon: CheckCircle }
     ];
 
     if (loading && !formData.mata_kuliah_id) {
@@ -555,14 +1006,30 @@ export default function RPSEditorPage() {
                         )}
                     </div>
                     <div className="flex gap-3">
-                        <button onClick={() => navigate(-1)} className="btn btn-ghost">Batal</button>
+                        <button onClick={() => navigate(-1)} className="btn btn-ghost text-gray-500 hover:text-gray-700">
+                            Batal
+                        </button>
+
+                        {/* Simpan Draft */}
                         <button
                             onClick={handleSaveToServer}
                             disabled={loading || !formData.mata_kuliah_id}
-                            className="btn btn-primary"
+                            className="btn bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-200 font-medium"
+                            title="Simpan sebagai draft, bisa diedit lagi nanti"
                         >
                             <Save size={18} className="mr-2" />
-                            {loading ? 'Menyimpan...' : 'Simpan ke Server'}
+                            {loading ? 'Menyimpan...' : 'Simpan Draft'}
+                        </button>
+
+                        {/* Simpan Final / Ajukan */}
+                        <button
+                            onClick={handleSubmitToApproval}
+                            disabled={loading || !formData.mata_kuliah_id}
+                            className="btn bg-green-700 hover:bg-green-800 text-white shadow-lg shadow-green-500/30 font-medium"
+                            title="Simpan dan ajukan ke Kaprodi untuk direview (Final)"
+                        >
+                            <CheckCircle size={18} className="mr-2" />
+                            {loading ? 'Memproses...' : 'Simpan dan Ajukan (Final)'}
                         </button>
                     </div>
                 </div>
@@ -588,94 +1055,196 @@ export default function RPSEditorPage() {
                 <div className="p-6">
                     {/* Section: Identitas MK */}
                     {activeSection === 'identitas' && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="label">Mata Kuliah</label>
-                                    <select
-                                        value={formData.mata_kuliah_id}
-                                        onChange={handleCourseChange}
-                                        className="input w-full"
-                                        disabled={!!rpsId}
-                                    >
-                                        <option value="">Pilih MK...</option>
-                                        {filteredCourses.map(c => (
-                                            <option key={c.id} value={c.id}>{c.kode_mk} - {c.nama_mk}</option>
-                                        ))}
-                                    </select>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Menampilkan MK semester {activeSemester || 'semua'}
-                                    </p>
-                                </div>
-                                <div className="grid grid-cols-3 gap-4">
+                        <>
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="label">Kode MK</label>
-                                        <input type="text" value={formData.kode_mk} disabled className="input bg-gray-100 dark:bg-gray-700 w-full" />
-                                    </div>
-                                    <div>
-                                        <label className="label">SKS</label>
-                                        <input type="text" value={formData.sks} disabled className="input bg-gray-100 dark:bg-gray-700 w-full" />
-                                    </div>
-                                    <div>
-                                        <label className="label">Revisi</label>
-                                        <input type="number" value={formData.revisi} onChange={e => setFormData({ ...formData, revisi: e.target.value })} className="input w-full" />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="label">Rumpun MK</label>
-                                    {!showNewRumpun ? (
-                                        <div className="flex gap-2">
-                                            <select value={formData.rumpun_mk} onChange={e => setFormData({ ...formData, rumpun_mk: e.target.value })} className="input flex-1">
-                                                <option value="">Pilih Rumpun...</option>
-                                                {rumpunOptions.map(r => <option key={r} value={r}>{r}</option>)}
-                                            </select>
-                                            <button onClick={() => setShowNewRumpun(true)} className="btn btn-outline btn-sm" title="Tambah Rumpun Baru">
-                                                <Plus size={16} />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex gap-2">
-                                            <input type="text" value={newRumpunValue} onChange={e => setNewRumpunValue(e.target.value)} className="input flex-1" placeholder="Nama rumpun baru..." autoFocus />
-                                            <button onClick={addNewRumpun} className="btn btn-primary btn-sm">Tambah</button>
-                                            <button onClick={() => { setShowNewRumpun(false); setNewRumpunValue(''); }} className="btn btn-ghost btn-sm"><X size={16} /></button>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="label">Semester</label>
-                                        <select value={formData.semester} onChange={e => setFormData({ ...formData, semester: e.target.value })} className="input w-full">
-                                            <option value="Ganjil">Ganjil</option>
-                                            <option value="Genap">Genap</option>
+                                        <label className="label">Mata Kuliah</label>
+                                        <select
+                                            value={formData.mata_kuliah_id}
+                                            onChange={handleCourseChange}
+                                            className="input w-full"
+                                            disabled={!!rpsId}
+                                        >
+                                            <option value="">Pilih MK...</option>
+                                            {filteredCourses.map(c => (
+                                                <option key={c.id} value={c.id}>{c.kode_mk} - {c.nama_mk}</option>
+                                            ))}
                                         </select>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Menampilkan MK semester {activeSemester || 'semua'}
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="label">Kode MK</label>
+                                            <input type="text" value={formData.kode_mk} disabled className="input bg-gray-100 dark:bg-gray-700 w-full" />
+                                        </div>
+                                        <div>
+                                            <label className="label">SKS</label>
+                                            <input type="text" value={formData.sks} disabled className="input bg-gray-100 dark:bg-gray-700 w-full" />
+                                        </div>
+                                        <div>
+                                            <label className="label">Revisi</label>
+                                            <input type="number" value={formData.revisi} onChange={e => setFormData({ ...formData, revisi: e.target.value })} className="input w-full" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="label">Rumpun MK</label>
+                                        {!showNewRumpun ? (
+                                            <div className="flex gap-2">
+                                                <select value={formData.rumpun_mk} onChange={e => setFormData({ ...formData, rumpun_mk: e.target.value })} className="input flex-1">
+                                                    <option value="">Pilih Rumpun...</option>
+                                                    {rumpunOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                                                </select>
+                                                <button onClick={() => setShowNewRumpun(true)} className="btn btn-outline btn-sm" title="Tambah Rumpun Baru">
+                                                    <Plus size={16} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-2">
+                                                <input type="text" value={newRumpunValue} onChange={e => setNewRumpunValue(e.target.value)} className="input flex-1" placeholder="Nama rumpun baru..." autoFocus />
+                                                <button onClick={addNewRumpun} className="btn btn-primary btn-sm">Tambah</button>
+                                                <button onClick={() => { setShowNewRumpun(false); setNewRumpunValue(''); }} className="btn btn-ghost btn-sm"><X size={16} /></button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="label">Semester</label>
+                                            <select value={formData.semester} onChange={e => setFormData({ ...formData, semester: e.target.value })} className="input w-full">
+                                                <option value="Ganjil">Ganjil</option>
+                                                <option value="Genap">Genap</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="label">Tahun Ajaran</label>
+                                            <input type="text" value={formData.tahun_ajaran} onChange={e => setFormData({ ...formData, tahun_ajaran: e.target.value })} className="input w-full" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="label text-xs font-bold uppercase text-gray-400">Pengembang RPS (Dosen)</label>
+                                        <input type="text" value={formData.pengembang_rps} onChange={e => setFormData({ ...formData, pengembang_rps: e.target.value })} className="input w-full" />
                                     </div>
                                     <div>
-                                        <label className="label">Tahun Ajaran</label>
-                                        <input type="text" value={formData.tahun_ajaran} onChange={e => setFormData({ ...formData, tahun_ajaran: e.target.value })} className="input w-full" />
+                                        <label className="label text-xs font-bold uppercase text-gray-400">Koordinator Rumpun MK</label>
+                                        <input type="text" value={formData.koordinator_rumpun_mk} onChange={e => setFormData({ ...formData, koordinator_rumpun_mk: e.target.value })} className="input w-full" placeholder="Nama Koordinator Rumpun..." />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="label text-xs font-bold uppercase text-gray-400">Ketua Program Studi</label>
+                                        <input type="text" value={formData.ketua_prodi} onChange={e => setFormData({ ...formData, ketua_prodi: e.target.value })} className="input w-full" />
+                                    </div>
+                                    <div className="hidden md:block"></div>
+                                </div>
+                                <div>
+                                    <label className="label text-xs font-bold uppercase text-gray-400">Deskripsi Mata Kuliah</label>
+                                    <textarea value={formData.deskripsi_mk} onChange={e => setFormData({ ...formData, deskripsi_mk: e.target.value })} className="input w-full min-h-[120px]" rows="4" placeholder="Deskripsi singkat mengenai mata kuliah..." />
+                                </div>
+                            </div>
+
+                            <div className="divider my-8"></div>
+
+                            {/* Integrated Info Tambahan */}
+                            <div className="space-y-8">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    <div className="space-y-6">
+                                        <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                                            <Users className="text-green-500" size={20} />
+                                            Tim Pengajar & Syarat
+                                        </h3>
+                                        <div>
+                                            <label className="label text-xs font-bold uppercase text-gray-400">Dosen Pengampu</label>
+                                            <p className="text-xs text-gray-500 mb-2">Simpan nama-nama dosen yang terlibat.</p>
+                                            <div className="flex gap-2 mb-3">
+                                                <input
+                                                    type="text"
+                                                    id="new-dosen-input"
+                                                    className="input input-sm flex-1"
+                                                    placeholder="Nama Dosen..."
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') {
+                                                            const val = e.target.value.trim();
+                                                            if (val) {
+                                                                setDosenPengampuList([...dosen_pengampu_list, val]);
+                                                                e.target.value = '';
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        const input = document.getElementById('new-dosen-input');
+                                                        const val = input.value.trim();
+                                                        if (val) {
+                                                            setDosenPengampuList([...dosen_pengampu_list, val]);
+                                                            input.value = '';
+                                                        }
+                                                    }}
+                                                    className="btn btn-sm btn-primary"
+                                                >
+                                                    Tambah
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {dosen_pengampu_list.map((d, i) => (
+                                                    <div key={i} className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full text-sm flex items-center gap-2 border border-gray-200 dark:border-gray-600">
+                                                        {d}
+                                                        <button onClick={() => setDosenPengampuList(dosen_pengampu_list.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700">
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                {dosen_pengampu_list.length === 0 && <span className="text-gray-400 italic text-sm">Belum ada dosen yang ditambahkan</span>}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="label text-xs font-bold uppercase text-gray-400 italic">Mata Kuliah Syarat</label>
+                                            <textarea
+                                                value={formData.mk_syarat}
+                                                onChange={e => setFormData({ ...formData, mk_syarat: e.target.value })}
+                                                className="input w-full min-h-[100px] text-sm"
+                                                placeholder="Contoh: Algoritma dan Pemrograman I..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                                            <ChevronRight className="text-yellow-500" size={20} />
+                                            Ambang Batas Kelulusan
+                                        </h3>
+                                        <div>
+                                            <label className="label text-xs font-bold uppercase text-gray-400 italic">Nilai Kelulusan Mahasiswa</label>
+                                            <textarea
+                                                value={formData.ambang_batas_mhs}
+                                                onChange={e => setFormData({ ...formData, ambang_batas_mhs: e.target.value })}
+                                                className="input w-full min-h-[100px] text-sm"
+                                                placeholder="Deskripsi ambang batas kelulusan mahasiswa..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label text-xs font-bold uppercase text-gray-400 italic">Kriteria Kelulusan Mata Kuliah</label>
+                                            <textarea
+                                                value={formData.ambang_batas_mk}
+                                                onChange={e => setFormData({ ...formData, ambang_batas_mk: e.target.value })}
+                                                className="input w-full min-h-[100px] text-sm"
+                                                placeholder="Deskripsi..."
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="label">Pengembang RPS</label>
-                                    <input type="text" value={formData.pengembang_rps} onChange={e => setFormData({ ...formData, pengembang_rps: e.target.value })} className="input w-full" />
-                                </div>
-                                <div>
-                                    <label className="label">Ketua Program Studi</label>
-                                    <input type="text" value={formData.ketua_prodi} onChange={e => setFormData({ ...formData, ketua_prodi: e.target.value })} className="input w-full" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="label">Deskripsi Mata Kuliah</label>
-                                <textarea value={formData.deskripsi_mk} onChange={e => setFormData({ ...formData, deskripsi_mk: e.target.value })} className="input w-full" rows="3" placeholder="Deskripsi singkat mengenai mata kuliah..." />
-                            </div>
-                        </div>
+                        </>
                     )}
 
                     {/* Section: CPL & CPMK */}
-                    {activeSection === 'cpl' && (
+                    {activeSection === 'capaian' && (
                         <div className="space-y-8">
 
                             {/* 1. CPL Table */}
@@ -833,115 +1402,477 @@ export default function RPSEditorPage() {
                                         </tfoot>
                                     </table>
                                 </div>
-                                {/* 3. Sub-CPMK Table */}
-                                <div>
-                                    <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">3. Sub-CPMK (Indikator Kinerja)</h3>
-                                    <p className="text-sm text-gray-500 mb-3">Definisikan Sub-CPMK yang lebih spesifik. Ini yang akan dipilih di Rencana Mingguan.</p>
+                            </div>
+                        </div>
+                    )}
 
-                                    <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
-                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                            <thead className="bg-gray-50 dark:bg-gray-700">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Kode</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deskripsi</th>
-                                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-48">CPMK Induk</th>
-                                                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">Aksi</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                {definedSubCPMKs.map(sub => {
-                                                    // Find parent CPMK details
-                                                    const parentCPL = availableCPLs.find(c => c.cpmks?.some(mk => mk.id === parseInt(sub.cpmk_id)));
-                                                    const parentCPMK = parentCPL?.cpmks?.find(mk => mk.id === parseInt(sub.cpmk_id));
-
-                                                    return (
-                                                        <tr key={sub.id}>
-                                                            <td className="px-4 py-3 font-semibold text-purple-600 dark:text-purple-400 align-top">
-                                                                {sub.kode}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300 align-top">
-                                                                {sub.deskripsi}
-                                                            </td>
-                                                            <td className="px-4 py-3 align-top text-xs">
-                                                                {parentCPMK ? (
-                                                                    <>
-                                                                        <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded font-mono block w-fit mb-1">
-                                                                            {parentCPMK.kode}
-                                                                        </span>
-                                                                        <div className="text-[10px] text-gray-400 leading-tight hidden xl:block">
-                                                                            {parentCPMK.deskripsi.substring(0, 50)}...
-                                                                        </div>
-                                                                    </>
-                                                                ) : <span className="text-red-500 italic">Induk terhapus</span>}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-center align-top">
-                                                                <button
-                                                                    onClick={() => handleDeleteSubCPMK(sub.id)}
-                                                                    className="text-red-500 hover:text-red-700"
-                                                                    title="Hapus"
-                                                                >
-                                                                    <Trash2 size={16} />
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                                {definedSubCPMKs.length === 0 && (
-                                                    <tr>
-                                                        <td colSpan="4" className="px-4 py-8 text-center text-gray-400 italic">Belum ada Sub-CPMK yang didefinisikan</td>
-                                                    </tr>
-                                                )}
-                                            </tbody>
-                                            <tfoot className="bg-gray-50 dark:bg-gray-800/50">
-                                                <tr>
-                                                    <td className="px-4 py-3 align-top">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Kode (ex: L1)"
-                                                            className="input input-sm w-full"
-                                                            value={newSubCpmk.kode}
-                                                            onChange={e => setNewSubCpmk({ ...newSubCpmk, kode: e.target.value })}
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-3 align-top">
-                                                        <textarea
-                                                            placeholder="Deskripsi Sub-CPMK..."
-                                                            className="input input-sm w-full resize-none h-20 leading-tight py-2"
-                                                            value={newSubCpmk.deskripsi}
-                                                            onChange={e => setNewSubCpmk({ ...newSubCpmk, deskripsi: e.target.value })}
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-3 align-top">
-                                                        <select
-                                                            className="select select-sm w-full"
-                                                            value={newSubCpmk.cpmk_id}
-                                                            onChange={e => setNewSubCpmk({ ...newSubCpmk, cpmk_id: e.target.value })}
-                                                            disabled={selectedCPMKs.length === 0}
-                                                        >
-                                                            <option value="">Pilih CPMK Induk...</option>
-                                                            {selectedCPMKs.map(id => {
-                                                                const parentCPL = availableCPLs.find(c => c.cpmks?.some(mk => mk.id === id));
-                                                                const mk = parentCPL?.cpmks?.find(m => m.id === id);
-                                                                if (!mk) return null;
-                                                                return <option key={id} value={id}>{mk.kode}</option>
-                                                            })}
-                                                        </select>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center align-top">
-                                                        <button
-                                                            onClick={handleAddSubCPMKLocal}
-                                                            className="btn btn-sm btn-primary w-full"
-                                                            disabled={!newSubCpmk.kode || !newSubCpmk.deskripsi || !newSubCpmk.cpmk_id}
-                                                        >
-                                                            <Plus size={16} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            </tfoot>
-                                        </table>
-                                    </div>
+                    {/* Section: Sub-CPMK Management (Phase 24) */}
+                    {activeSection === 'subcpmk' && (
+                        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                    <Users className="text-blue-600" /> Manajemen Sub-CPMK
+                                </h2>
+                                <div className="text-sm text-gray-500">
+                                    Urutkan Sub-CPMK di sini untuk menyusun alur pembelajaran mingguan.
                                 </div>
                             </div>
+
+                            {/* Sub-CPMK List with Reordering */}
+                            <div className="space-y-3 mb-8">
+                                {definedSubCPMKs.map((sub, idx) => (
+                                    <div key={sub.id || idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 group hover:border-blue-300 transition-colors">
+                                        <div className="flex flex-col gap-1 mt-1">
+                                            <button
+                                                onClick={() => moveSubCPMK(idx, 'up')}
+                                                disabled={idx === 0}
+                                                className="btn btn-xs btn-ghost btn-square disabled:opacity-20 hover:bg-gray-200 text-gray-600"
+                                                title="Geser Naik"
+                                            >
+                                                <ChevronDown className="rotate-180" size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => moveSubCPMK(idx, 'down')}
+                                                disabled={idx === definedSubCPMKs.length - 1}
+                                                className="btn btn-xs btn-ghost btn-square disabled:opacity-20 hover:bg-gray-200 text-gray-600"
+                                                title="Geser Turun"
+                                            >
+                                                <ChevronDown size={16} />
+                                            </button>
+                                        </div>
+                                        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4">
+                                            <div className="col-span-2">
+                                                <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Kode</label>
+                                                <input
+                                                    type="text"
+                                                    value={sub.kode}
+                                                    onChange={(e) => updateSubCPMK(sub.id, 'kode', e.target.value)}
+                                                    className="input input-sm input-bordered w-full font-mono font-bold text-purple-700"
+                                                />
+                                            </div>
+                                            <div className="col-span-8">
+                                                <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Deskripsi & Indikator</label>
+                                                <textarea
+                                                    value={sub.deskripsi}
+                                                    onChange={(e) => updateSubCPMK(sub.id, 'deskripsi', e.target.value)}
+                                                    className="textarea textarea-sm textarea-bordered w-full leading-tight min-h-[3rem]"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Durasi (Minggu)</label>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="16"
+                                                        value={sub.estimasi_minggu || 1}
+                                                        onChange={(e) => updateSubCPMK(sub.id, 'estimasi_minggu', e.target.value)}
+                                                        className="input input-sm input-bordered w-full text-center font-bold bg-yellow-50 border-yellow-200"
+                                                    />
+                                                    <span className="text-xs text-gray-400">Ptm</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => handleDeleteSubCPMK(sub.id)} className="btn btn-ghost btn-sm text-red-500 opacity-50 hover:opacity-100 mt-4">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {definedSubCPMKs.length === 0 && (
+                                    <div className="text-center py-12 text-gray-400 border-2 border-dashed rounded-lg bg-gray-50/50">
+                                        <p className="mb-2">Belum ada Sub-CPMK.</p>
+                                        <p className="text-xs">Tambahkan menggunakan form di bawah ini.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Add New Sub-CPMK Form */}
+                            <div className="bg-blue-50 p-5 rounded-lg border border-blue-100 shadow-sm">
+                                <h3 className="font-bold text-sm text-blue-800 mb-4 flex items-center gap-2">
+                                    <Plus size={16} /> Tambah Sub-CPMK Baru
+                                </h3>
+                                <div className="flex flex-col md:flex-row gap-4 items-end">
+                                    <div className="w-full md:w-1/3">
+                                        <label className="label-text text-xs font-bold text-gray-500 uppercase mb-1 block">Pilih CPMK Induk</label>
+                                        <select
+                                            className="select select-sm select-bordered w-full"
+                                            value={newSubCpmk.cpmk_id}
+                                            onChange={e => setNewSubCpmk({ ...newSubCpmk, cpmk_id: e.target.value })}
+                                        >
+                                            <option value="">- Pilih CPMK -</option>
+                                            {selectedCPMKs.map(id => {
+                                                const parentCPL = availableCPLs.find(c => c.cpmks?.some(mk => mk.id === id));
+                                                const mk = parentCPL?.cpmks?.find(m => m.id === id);
+                                                if (mk) return <option key={id} value={id}>{mk.kode} - {mk.deskripsi.substring(0, 40)}...</option>;
+
+                                                // Fallback
+                                                const rMK = resolvedCPMKs.find(m => String(m.id) === String(id));
+                                                if (rMK) return <option key={id} value={id}>{rMK.kode_cpmk || rMK.kode}</option>;
+                                                return <option key={id} value={id}>CPMK ID: {id}</option>;
+                                            })}
+                                        </select>
+                                    </div>
+                                    <div className="w-full md:w-1/6">
+                                        <label className="label-text text-xs font-bold text-gray-500 uppercase mb-1 block">Kode Sub</label>
+                                        <input
+                                            type="text"
+                                            className="input input-sm input-bordered w-full"
+                                            placeholder="Ex: 1.1"
+                                            value={newSubCpmk.kode}
+                                            onChange={e => setNewSubCpmk({ ...newSubCpmk, kode: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="flex-1 w-full">
+                                        <label className="label-text text-xs font-bold text-gray-500 uppercase mb-1 block">Deskripsi</label>
+                                        <input
+                                            type="text"
+                                            className="input input-sm input-bordered w-full"
+                                            placeholder="Mahasiswa mampu menjelaskan..."
+                                            value={newSubCpmk.deskripsi}
+                                            onChange={e => setNewSubCpmk({ ...newSubCpmk, deskripsi: e.target.value })}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleAddSubCPMKLocal}
+                                        disabled={!newSubCpmk.cpmk_id || !newSubCpmk.kode}
+                                        className="btn btn-sm btn-primary px-6"
+                                    >
+                                        Tambah
+                                    </button>
+                                </div>
+                            </div>
+
+
+
+                            {/* Generator Button */}
+                            <div className="flex flex-col md:flex-row justify-between items-center bg-yellow-50 p-6 rounded-lg border border-yellow-200 mt-8 mb-8">
+                                <div className="mb-4 md:mb-0 pr-4">
+                                    <h4 className="font-bold text-yellow-800 text-lg flex items-center gap-2">
+                                        <Monitor size={20} /> Generator Rencana Mingguan
+                                    </h4>
+                                    <p className="text-sm text-yellow-700 mt-1 max-w-xl">
+                                        Fitur ini akan <strong>secara otomatis membuat (atau menimpa)</strong> seluruh baris di tab "Rencana Mingguan" berdasarkan urutan Sub-CPMK di atas dan durasi pertemuannya.
+                                    </p>
+                                </div>
+                                <div>
+                                    <button
+                                        onClick={generateWeeklyPlan}
+                                        className="btn btn-warning shadow-md border-yellow-400 text-yellow-900"
+                                    >
+                                        Generate Ulang (Reset) &rarr;
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (confirm('Sinkronisasi akan menyesuaikan mingguan dengan Sub_CPMK tanpa menghapus konten yang sudah diisi (materi/metode/dll). Lanjutkan?')) {
+                                                syncWeeklyPlan();
+                                            }
+                                        }}
+                                        className="btn btn-primary shadow-md ml-2"
+                                        title="Sesuaikan mingguan dengan Sub-CPMK tanpa hapus isi"
+                                    >
+                                        <RefreshCw size={18} className="mr-2" /> Sync Smart
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="divider my-8"></div>
+
+                            {/* Matrix & Bobot - Re-inserted */}
+                            <div className="space-y-6">
+                                <div className="alert alert-info shadow-sm bg-blue-50 border-blue-200 text-blue-800">
+                                    <Monitor size={20} />
+                                    <div>
+                                        <h3 className="font-bold">Matriks Penilaian (Sub-CPMK vs Evaluasi)</h3>
+                                        <p className="text-sm">Ringkasan bobot (%) per Sub-CPMK berdasarkan rencana mingguan. Pastikan total 100%.</p>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
+                                    <table className="table table-sm w-full">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th>Kode Sub-CPMK</th>
+                                                <th>Deskripsi</th>
+                                                <th className="text-center">Minggu</th>
+                                                <th className="text-center">Bobot</th>
+                                                <th className="text-center">Evaluasi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {definedSubCPMKs.map(sub => {
+                                                const relatedRows = rows.filter(r => String(r.sub_cpmk_id) === String(sub.id));
+                                                const totalWeight = relatedRows.reduce((sum, r) => sum + (parseFloat(r.bobot_penilaian) || 0), 0);
+                                                const weeks = relatedRows.map(r => r.minggu_ke + (r.sampai_minggu_ke ? `-${r.sampai_minggu_ke}` : '')).join(', ');
+                                                const forms = [...new Set(relatedRows.map(r => r.bentuk_evaluasi).filter(Boolean))].join(', ');
+
+                                                return (
+                                                    <tr key={sub.id}>
+                                                        <td className="font-mono font-bold">{sub.kode}</td>
+                                                        <td className="text-xs max-w-xs truncate" title={sub.deskripsi}>{sub.deskripsi}</td>
+                                                        <td className="text-center">{weeks || '-'}</td>
+                                                        <td className="text-center font-bold">{totalWeight}%</td>
+                                                        <td className="text-center text-xs">{forms || '-'}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {/* UTS & UAS */}
+                                            {rows.filter(r => r.is_uts).map(r => (
+                                                <tr key={r.id} className="bg-yellow-50/50">
+                                                    <td colSpan={2} className="font-bold text-center">UTS</td>
+                                                    <td className="text-center">{r.minggu_ke}</td>
+                                                    <td className="text-center font-bold">{r.bobot_penilaian || 0}%</td>
+                                                    <td className="text-center">Ujian Tulis/Praktik</td>
+                                                </tr>
+                                            ))}
+                                            {rows.filter(r => r.is_uas).map(r => (
+                                                <tr key={r.id} className="bg-yellow-50/50">
+                                                    <td colSpan={2} className="font-bold text-center">UAS</td>
+                                                    <td className="text-center">{r.minggu_ke}</td>
+                                                    <td className="text-center font-bold">{r.bobot_penilaian || 0}%</td>
+                                                    <td className="text-center">Ujian Tulis/Praktik</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot className="bg-gray-100 font-bold">
+                                            <tr>
+                                                <td colSpan={3} className="text-right">Total Bobot:</td>
+                                                <td className={`text-center ${totalBobot === 100 ? 'text-green-600' : 'text-red-500'}`}>{totalBobot}%</td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+
+                        </div>
+                    )}
+
+                    {/* Section: Metode Penilaian */}
+                    {activeSection === 'metode_penilaian' && (
+                        <div className="space-y-6">
+                            <div className="alert alert-info shadow-sm bg-purple-50 border-purple-200 text-purple-800">
+                                <CheckCircle size={20} />
+                                <div>
+                                    <h3 className="font-bold">Metode Penilaian & Kriteria</h3>
+                                    <p className="text-sm">Tentukan metode penilaian yang digunakan (Rubrik, Portofolio, Tes, dsb) beserta kriteria dan detailnya.</p>
+                                </div>
+                            </div>
+
+                            {/* List of Defined Methods */}
+                            <div className="space-y-4">
+                                {metodePenilaian.map((metode, idx) => (
+                                    <div key={idx} className="border rounded-lg bg-white dark:bg-gray-800 p-4 relative">
+                                        <button
+                                            onClick={() => {
+                                                const newMetodes = [...metodePenilaian];
+                                                newMetodes.splice(idx, 1);
+                                                setMetodePenilaian(newMetodes);
+                                            }}
+                                            className="absolute top-4 right-4 text-red-500 hover:text-red-700"
+                                            title="Hapus Metode"
+                                        >
+                                            <X size={16} />
+                                        </button>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 pr-8">
+                                            <div>
+                                                <label className="label text-xs font-bold uppercase text-gray-500">Jenis Penilaian</label>
+                                                <select
+                                                    value={metode.type}
+                                                    onChange={(e) => {
+                                                        const newMetodes = [...metodePenilaian];
+                                                        newMetodes[idx].type = e.target.value;
+                                                        setMetodePenilaian(newMetodes);
+                                                    }}
+                                                    className="select select-sm w-full border-gray-300"
+                                                >
+                                                    {assessmentTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="label text-xs font-bold uppercase text-gray-500">Nama / Judul</label>
+                                                <input
+                                                    type="text"
+                                                    value={metode.name || ''}
+                                                    onChange={(e) => {
+                                                        const newMetodes = [...metodePenilaian];
+                                                        newMetodes[idx].name = e.target.value;
+                                                        setMetodePenilaian(newMetodes);
+                                                    }}
+                                                    className="input input-sm w-full border-gray-300"
+                                                    placeholder={`Contoh: ${metode.type} 1`}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {metode.type === 'Rubrik' ? (
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <label className="label text-xs font-bold uppercase text-gray-500">Tabel Rubrik</label>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            className="btn btn-xs btn-outline"
+                                                            onClick={() => {
+                                                                const newMetodes = [...metodePenilaian];
+                                                                // Add scale column
+                                                                newMetodes[idx].scales = [...(newMetodes[idx].scales || []), { label: 'Baru', value: 0 }];
+                                                                setMetodePenilaian(newMetodes);
+                                                            }}
+                                                        >
+                                                            + Skala
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-xs btn-outline"
+                                                            onClick={() => {
+                                                                const newMetodes = [...metodePenilaian];
+                                                                // Add criteria row
+                                                                newMetodes[idx].criteria = [...(newMetodes[idx].criteria || []), { label: 'Kriteria Baru', descriptions: [] }];
+                                                                setMetodePenilaian(newMetodes);
+                                                            }}
+                                                        >
+                                                            + Kriteria
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="overflow-x-auto border rounded">
+                                                    <table className="table table-xs w-full">
+                                                        <thead className="bg-gray-50">
+                                                            <tr>
+                                                                <th className="w-1/4">Kriteria \ Skala</th>
+                                                                {(metode.scales || []).map((scale, sIdx) => (
+                                                                    <th key={sIdx} className="text-center min-w-[100px]">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={scale.label}
+                                                                            onChange={(e) => {
+                                                                                const newMetodes = [...metodePenilaian];
+                                                                                newMetodes[idx].scales[sIdx].label = e.target.value;
+                                                                                setMetodePenilaian(newMetodes);
+                                                                            }}
+                                                                            className="w-full text-center bg-transparent border-b border-dashed border-gray-300 focus:outline-none mb-1 font-bold"
+                                                                            placeholder="Label"
+                                                                        />
+                                                                        <input
+                                                                            type="number"
+                                                                            value={scale.value}
+                                                                            onChange={(e) => {
+                                                                                const newMetodes = [...metodePenilaian];
+                                                                                newMetodes[idx].scales[sIdx].value = e.target.value;
+                                                                                setMetodePenilaian(newMetodes);
+                                                                            }}
+                                                                            className="w-full text-center bg-transparent border-none text-xs text-gray-500"
+                                                                            placeholder="Nilai"
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const newMetodes = [...metodePenilaian];
+                                                                                newMetodes[idx].scales.splice(sIdx, 1);
+                                                                                // Also remove descriptions at this index
+                                                                                newMetodes[idx].criteria.forEach(c => {
+                                                                                    if (c.descriptions && c.descriptions.length > sIdx) {
+                                                                                        c.descriptions.splice(sIdx, 1);
+                                                                                    }
+                                                                                });
+                                                                                setMetodePenilaian(newMetodes);
+                                                                            }}
+                                                                            className="text-[10px] text-red-300 hover:text-red-500 block mx-auto mt-1"
+                                                                        >Hapus</button>
+                                                                    </th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {(metode.criteria || []).map((crit, cIdx) => (
+                                                                <tr key={cIdx}>
+                                                                    <td className="align-top relative group">
+                                                                        <textarea
+                                                                            value={crit.label}
+                                                                            onChange={(e) => {
+                                                                                const newMetodes = [...metodePenilaian];
+                                                                                newMetodes[idx].criteria[cIdx].label = e.target.value;
+                                                                                setMetodePenilaian(newMetodes);
+                                                                            }}
+                                                                            className="w-full bg-transparent border border-transparent hover:border-gray-200 rounded p-1 text-sm h-full font-medium"
+                                                                            placeholder="Nama Kriteria..."
+                                                                            rows={3}
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const newMetodes = [...metodePenilaian];
+                                                                                newMetodes[idx].criteria.splice(cIdx, 1);
+                                                                                setMetodePenilaian(newMetodes);
+                                                                            }}
+                                                                            className="absolute top-1 right-1 text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        ><Trash2 size={12} /></button>
+                                                                    </td>
+                                                                    {(metode.scales || []).map((_, sIdx) => (
+                                                                        <td key={sIdx} className="align-top p-1">
+                                                                            <textarea
+                                                                                value={crit.descriptions?.[sIdx] || ''}
+                                                                                onChange={(e) => {
+                                                                                    const newMetodes = [...metodePenilaian];
+                                                                                    if (!newMetodes[idx].criteria[cIdx].descriptions) {
+                                                                                        newMetodes[idx].criteria[cIdx].descriptions = [];
+                                                                                    }
+                                                                                    newMetodes[idx].criteria[cIdx].descriptions[sIdx] = e.target.value;
+                                                                                    setMetodePenilaian(newMetodes);
+                                                                                }}
+                                                                                className="w-full h-full min-h-[60px] text-xs p-1 border border-gray-100 rounded focus:border-blue-300 focus:ring-0 resize-none"
+                                                                                placeholder="Deskripsi..."
+                                                                            />
+                                                                        </td>
+                                                                    ))}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div className="text-xs text-gray-400 italic mt-1">
+                                                    * Klik tombol "+ Skala" untuk menambah kolom penilaian (Sangat Baik, Baik, dsb).
+                                                    <br />* Klik tombol "+ Kriteria" untuk menambah baris aspek yang dinilai.
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <label className="label text-xs font-bold uppercase text-gray-500">Deskripsi / Detail Penilaian</label>
+                                                <textarea
+                                                    value={metode.description || ''}
+                                                    onChange={(e) => {
+                                                        const newMetodes = [...metodePenilaian];
+                                                        newMetodes[idx].description = e.target.value;
+                                                        setMetodePenilaian(newMetodes);
+                                                    }}
+                                                    className="textarea textarea-bordered h-32 w-full"
+                                                    placeholder="Jelaskan mekanisme penilaian secara detail..."
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+
+                                {metodePenilaian.length === 0 && (
+                                    <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                        <p className="text-gray-400 mb-4">Belum ada metode penilaian yang didefinisikan.</p>
+                                        <button
+                                            onClick={() => setMetodePenilaian([...metodePenilaian, { type: 'Rubrik', name: '', description: '', scales: [{ label: 'Sangat Baik', value: 85 }, { label: 'Baik', value: 70 }, { label: 'Cukup', value: 55 }, { label: 'Kurang', value: 40 }], criteria: [{ label: 'Kriteria 1', descriptions: [] }] }])}
+                                            className="btn btn-primary btn-sm"
+                                        >
+                                            <Plus size={16} className="mr-2" /> Tambah Metode Penilaian
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {metodePenilaian.length > 0 && (
+                                <button
+                                    onClick={() => setMetodePenilaian([...metodePenilaian, { type: 'Rubrik', name: '', description: '', scales: [], criteria: [] }])}
+                                    className="btn btn-outline btn-sm w-full border-dashed"
+                                >
+                                    <Plus size={16} className="mr-2" /> Tambah Metode Lain
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -959,196 +1890,256 @@ export default function RPSEditorPage() {
                                     </p>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={addWeek} className="btn btn-outline btn-sm">
-                                        <Plus size={16} className="mr-1" /> Tambah Baris
+                                    <button onClick={handleAddUTS} className="btn btn-warning btn-sm text-white">
+                                        <Plus size={16} className="mr-1" /> Tambah UTS
+                                    </button>
+                                    <button onClick={handleAddUAS} className="btn btn-warning btn-sm text-white">
+                                        <Plus size={16} className="mr-1" /> Tambah UAS
+                                    </button>
+                                    <button onClick={addWeek} className="btn btn-primary btn-sm">
+                                        <Plus size={16} className="mr-1" /> Tambah Minggu
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="overflow-x-auto border rounded-lg bg-white dark:bg-gray-800">
-                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-                                    <thead className="bg-gray-100 dark:bg-gray-700">
-                                        <tr>
-                                            <th className="px-2 py-3 text-center font-semibold w-16">Mg</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[100px] w-24">CPMK</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[200px]">Sub-CPMK</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[150px]">Indikator</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[150px]">Kriteria & Penilaian</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[150px]">Materi</th>
-                                            <th className="px-2 py-3 text-left font-semibold min-w-[150px]">Metode</th>
-                                            <th className="px-2 py-3 text-center font-semibold w-16">Bentuk</th>
-                                            <th className="px-2 py-3 text-center font-semibold w-12">%</th>
-                                            <th className="px-2 py-3 w-8"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                        {rows.map((row, index) => {
-                                            // Handle case where id might be string vs number
-                                            const selectedSub = definedSubCPMKs.find(s => String(s.id) === String(row.sub_cpmk_id));
+                            <div className="space-y-4">
+                                {rows.map((row, index) => {
+                                    // Handle case where id might be string vs number
+                                    const selectedSub = definedSubCPMKs.find(s => String(s.id) === String(row.sub_cpmk_id));
 
-                                            // Parent Resolution
-                                            let parentCPMKCode = '-';
+                                    // Parent Resolution
+                                    let parentCPMKCode = '-';
+                                    if (selectedSub) {
+                                        const pCPL = availableCPLs.find(c => c.cpmks?.some(mk => mk.id === parseInt(selectedSub.cpmk_id)));
+                                        const pCPMK = pCPL?.cpmks?.find(mk => mk.id === parseInt(selectedSub.cpmk_id));
+                                        if (pCPMK) {
+                                            parentCPMKCode = pCPMK.kode;
+                                        } else {
+                                            // Fallback to resolved data
+                                            const rCPMK = resolvedCPMKs.find(m => String(m.id) === String(selectedSub.cpmk_id));
+                                            if (rCPMK) parentCPMKCode = rCPMK.kode_cpmk || rCPMK.kode || '-';
+                                        }
+                                    }
 
-                                            if (selectedSub) {
-                                                const pCPL = availableCPLs.find(c => c.cpmks?.some(mk => mk.id === parseInt(selectedSub.cpmk_id)));
-                                                const pCPMK = pCPL?.cpmks?.find(mk => mk.id === parseInt(selectedSub.cpmk_id));
-                                                if (pCPMK) parentCPMKCode = pCPMK.kode;
-                                            }
+                                    // Special Rendering for UTS/UAS - Merged Style
+                                    if (row.is_uts || row.is_uas) {
+                                        return (
+                                            <div key={row.id} className="border-2 border-yellow-400 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg p-4 relative flex items-center shadow-md">
+                                                <button onClick={() => removeWeek(index)} className="absolute top-2 right-2 btn btn-ghost btn-xs text-red-500"><Trash2 size={16} /></button>
 
-                                            return (
-                                                <tr key={row.id} className={row.is_uts || row.is_uas ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'hover:bg-gray-50 dark:hover://bg-gray-700/50'}>
-                                                    {/* Minggu Ke (Editable) */}
-                                                    <td className="px-2 py-2 text-center align-top">
-                                                        <input
-                                                            type="text"
-                                                            value={row.minggu_ke}
-                                                            onChange={e => updateRow(index, 'minggu_ke', e.target.value)}
-                                                            className="w-full text-center border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none bg-transparent font-bold text-gray-500"
-                                                        />
-                                                        {row.is_uts && <span className="block text-[10px] font-bold text-yellow-600 uppercase mt-1">UTS</span>}
-                                                        {row.is_uas && <span className="block text-[10px] font-bold text-yellow-600 uppercase mt-1">UAS</span>}
-                                                    </td>
+                                                <div className="w-16 mr-4 text-center">
+                                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Minggu</label>
+                                                    <input
+                                                        type="text"
+                                                        value={row.minggu_ke}
+                                                        readOnly
+                                                        className="input input-sm input-bordered w-full text-center font-bold bg-white"
+                                                    />
+                                                </div>
 
-                                                    {/* CPMK (Read Only) */}
-                                                    <td className="px-2 py-2 align-top">
-                                                        <div className="px-2 py-1.5 bg-gray-50 dark:bg-gray-700 rounded text-xs font-mono text-center border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300">
-                                                            {parentCPMKCode}
-                                                        </div>
-                                                    </td>
+                                                <div className="flex-1 text-center font-bold text-xl text-yellow-800 uppercase tracking-wider">
+                                                    {row.is_uts ? 'Evaluasi Tengah Semester (UTS)' : 'Evaluasi Akhir Semester (UAS)'}
+                                                </div>
 
-                                                    {/* Sub-CPMK Selection */}
-                                                    <td className="px-2 py-2 align-top">
-                                                        <select
-                                                            value={row.sub_cpmk_id || ''}
-                                                            onChange={e => {
-                                                                const subId = e.target.value;
-                                                                const sub = definedSubCPMKs.find(s => String(s.id) === String(subId));
+                                                <div className="w-20 ml-4 text-center">
+                                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Bobot (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={row.bobot_penilaian}
+                                                        onChange={e => updateRow(index, 'bobot_penilaian', e.target.value)}
+                                                        className="input input-sm input-bordered w-full text-center font-bold bg-white"
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    }
 
-                                                                const newRow = { ...row, sub_cpmk_id: subId };
-                                                                if (sub) {
-                                                                    newRow.cpmk_id = sub.cpmk_id;
-                                                                } else {
-                                                                    newRow.cpmk_id = '';
-                                                                }
+                                    // Regular Meeting Card
+                                    return (
+                                        <div key={row.id} className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm p-4 relative hover:border-blue-300 transition-colors">
+                                            <button onClick={() => removeWeek(index)} className="absolute top-2 right-2 btn btn-ghost btn-xs text-red-500 opacity-50 hover:opacity-100">
+                                                <Trash2 size={16} />
+                                            </button>
+
+                                            {/* Header Row: Week, CPMK, Sub-CPMK, Bobot */}
+                                            <div className="flex flex-wrap gap-4 items-end mb-4 pr-8">
+                                                <div className="w-16 text-center">
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Minggu</label>
+                                                    <input
+                                                        type="text"
+                                                        value={row.sampai_minggu_ke ? `${row.minggu_ke}-${row.sampai_minggu_ke}` : row.minggu_ke}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            // Check for range like "1-2"
+                                                            const parts = val.split('-').map(p => p.trim());
+                                                            if (parts.length === 2) {
+                                                                const start = parseInt(parts[0]) || row.minggu_ke;
+                                                                const end = parseInt(parts[1]) || null;
 
                                                                 const newRows = [...rows];
-                                                                newRows[index] = newRow;
+                                                                newRows[index] = {
+                                                                    ...newRows[index],
+                                                                    minggu_ke: start,
+                                                                    sampai_minggu_ke: end
+                                                                };
                                                                 setRows(newRows);
-                                                            }}
-                                                            className="w-full px-2 py-1.5 border rounded text-xs dark:bg-gray-800 font-medium"
-                                                        >
-                                                            <option value="">- Pilih Sub-CPMK -</option>
-                                                            {definedSubCPMKs.map(sub => (
-                                                                <option key={sub.id} value={sub.id}>{sub.kode} - {sub.deskripsi.substring(0, 30)}...</option>
-                                                            ))}
-                                                        </select>
-                                                        {selectedSub && (
-                                                            <div className="mt-1 text-[10px] text-gray-400 italic leading-tight">
-                                                                {selectedSub.deskripsi}
-                                                            </div>
-                                                        )}
-                                                    </td>
+                                                            } else {
+                                                                // Single value
+                                                                updateRow(index, 'minggu_ke', val);
+                                                                // Clear range if just one number
+                                                                const newRows = [...rows];
+                                                                if (newRows[index].sampai_minggu_ke) {
+                                                                    newRows[index].sampai_minggu_ke = null;
+                                                                    setRows(newRows);
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="input input-sm input-bordered w-full text-center font-bold"
+                                                    />
+                                                </div>
 
-                                                    {/* Indikator */}
-                                                    <td className="px-2 py-2 align-top">
-                                                        <textarea
-                                                            value={row.indikator}
-                                                            onChange={e => updateRow(index, 'indikator', e.target.value)}
-                                                            className="w-full px-2 py-1.5 border rounded text-xs dark:bg-gray-800 resize-none h-24"
-                                                            placeholder="Indikator..."
-                                                        />
-                                                    </td>
+                                                <div className="w-24 text-center hidden md:block">
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">CPMK</label>
+                                                    <div className="px-2 py-1.5 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono border border-gray-200 dark:border-gray-600">
+                                                        {parentCPMKCode}
+                                                    </div>
+                                                </div>
 
-                                                    {/* Kriteria & Penilaian */}
-                                                    <td className="px-2 py-2 align-top">
-                                                        <textarea
-                                                            value={row.kriteria_penilaian}
-                                                            onChange={e => updateRow(index, 'kriteria_penilaian', e.target.value)}
-                                                            className="w-full px-2 py-1.5 border rounded text-xs dark:bg-gray-800 resize-none h-24 mb-1"
-                                                            placeholder="Kriteria..."
-                                                        />
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {teknikPenilaian.slice(0, 4).map(t => (
-                                                                <label key={t} className={`text-[10px] px-1 py-0.5 rounded cursor-pointer border ${(row.teknik_penilaian || []).includes(t)
-                                                                    ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30'
-                                                                    : 'bg-white border-gray-200 text-gray-500'
-                                                                    }`}>
-                                                                    <input type="checkbox" checked={(row.teknik_penilaian || []).includes(t)} onChange={() => toggleMultiSelect(index, 'teknik_penilaian', t, 3)} className="hidden" />
-                                                                    {t.split(' ')[0]}
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    </td>
+                                                <div className="flex-1 min-w-[200px]">
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Sub-CPMK (Kemampuan Akhir)</label>
+                                                    <select
+                                                        value={row.sub_cpmk_id || ''}
+                                                        onChange={e => {
+                                                            const subId = e.target.value;
+                                                            const sub = definedSubCPMKs.find(s => String(s.id) === String(subId));
+                                                            const newRow = { ...row, sub_cpmk_id: subId };
+                                                            if (sub) {
+                                                                newRow.cpmk_id = sub.cpmk_id;
+                                                            } else {
+                                                                newRow.cpmk_id = '';
+                                                            }
+                                                            const newRows = [...rows];
+                                                            newRows[index] = newRow;
+                                                            setRows(newRows);
+                                                        }}
+                                                        className="select select-sm select-bordered w-full text-xs font-medium"
+                                                    >
+                                                        <option value="">- Pilih Sub-CPMK -</option>
+                                                        {definedSubCPMKs.map(sub => (
+                                                            <option key={sub.id} value={sub.id}>{sub.kode} - {sub.deskripsi}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
 
-                                                    {/* Materi */}
-                                                    <td className="px-2 py-2 align-top">
-                                                        <textarea
-                                                            value={row.materi}
-                                                            onChange={e => updateRow(index, 'materi', e.target.value)}
-                                                            className="w-full px-2 py-1.5 border rounded text-xs dark:bg-gray-800 resize-none h-24"
-                                                            placeholder={row.is_uts ? "Materi UTS" : row.is_uas ? "Materi UAS" : "Materi..."}
-                                                        />
-                                                    </td>
+                                                <div className="w-20 text-center">
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Bobot (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={row.bobot_penilaian}
+                                                        onChange={e => updateRow(index, 'bobot_penilaian', e.target.value)}
+                                                        className={`input input-sm input-bordered w-full text-center font-bold ${!row.bobot_penilaian ? 'bg-red-50 border-red-200' : ''}`}
+                                                    />
+                                                </div>
+                                            </div>
 
-                                                    {/* Metode */}
-                                                    <td className="px-2 py-2 align-top">
-                                                        <div className="flex flex-col gap-1">
-                                                            {metodePembelajaran.slice(0, 5).map(m => (
-                                                                <label key={m} className={`flex items-center gap-1.5 text-[10px] px-1.5 py-1 rounded cursor-pointer border ${(row.metode_pembelajaran || []).includes(m)
-                                                                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30'
-                                                                    : 'bg-white border-gray-200 text-gray-500'
-                                                                    }`}>
-                                                                    <input type="checkbox" checked={(row.metode_pembelajaran || []).includes(m)} onChange={() => toggleMultiSelect(index, 'metode_pembelajaran', m, 3)} className="h-3 w-3" />
-                                                                    {m}
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    </td>
+                                            {/* Content Grid */}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* Indikator */}
+                                                <div className="form-control">
+                                                    <label className="label py-1">
+                                                        <span className="label-text text-xs font-bold text-gray-500 uppercase">Indikator Penilaian</span>
+                                                    </label>
+                                                    <textarea
+                                                        value={row.indikator}
+                                                        onChange={e => updateRow(index, 'indikator', e.target.value)}
+                                                        className="textarea textarea-bordered w-full h-24 text-sm leading-relaxed"
+                                                        placeholder="Deskripsikan indikator..."
+                                                    />
+                                                </div>
 
-                                                    {/* Bentuk (L/D) */}
-                                                    <td className="px-2 py-2 text-center align-top">
-                                                        <div className="flex flex-col gap-1 justify-center items-center h-full">
-                                                            <label className={`w-8 h-8 flex items-center justify-center rounded border cursor-pointer ${row.bentuk_pembelajaran?.includes('luring') ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-400 border-gray-200'
+                                                {/* Kriteria & Teknik */}
+                                                <div className="form-control">
+                                                    <label className="label py-1 flex justify-between">
+                                                        <span className="label-text text-xs font-bold text-gray-500 uppercase">Kriteria & Teknik</span>
+                                                    </label>
+                                                    <textarea
+                                                        value={row.kriteria_penilaian}
+                                                        onChange={e => updateRow(index, 'kriteria_penilaian', e.target.value)}
+                                                        className="textarea textarea-bordered w-full h-24 text-sm leading-relaxed mb-2"
+                                                        placeholder="Deskripsikan kriteria..."
+                                                    />
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {teknikPenilaian.slice(0, 4).map(t => (
+                                                            <label key={t} className={`text-[10px] px-2 py-1 rounded-full cursor-pointer border transition-all ${(row.teknik_penilaian || []).includes(t)
+                                                                ? 'bg-blue-100 border-blue-300 text-blue-700 font-semibold'
+                                                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
                                                                 }`}>
-                                                                <input type="checkbox" checked={row.bentuk_pembelajaran?.includes('luring')} onChange={() => toggleBentukPembelajaran(index, 'luring')} className="hidden" />
-                                                                <span className="font-bold text-xs">L</span>
+                                                                <input type="checkbox" checked={(row.teknik_penilaian || []).includes(t)} onChange={() => toggleMultiSelect(index, 'teknik_penilaian', t, 3)} className="hidden" />
+                                                                {t}
                                                             </label>
-                                                            <label className={`w-8 h-8 flex items-center justify-center rounded border cursor-pointer ${row.bentuk_pembelajaran?.includes('daring') ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-400 border-gray-200'
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Materi */}
+                                                <div className="form-control">
+                                                    <label className="label py-1">
+                                                        <span className="label-text text-xs font-bold text-gray-500 uppercase">Materi Pembelajaran</span>
+                                                    </label>
+                                                    <textarea
+                                                        value={row.materi}
+                                                        onChange={e => updateRow(index, 'materi', e.target.value)}
+                                                        className="textarea textarea-bordered w-full h-24 text-sm leading-relaxed"
+                                                        placeholder="Isi materi..."
+                                                    />
+                                                </div>
+
+                                                {/* Metode & Bentuk */}
+                                                <div className="form-control">
+                                                    <label className="label py-1 flex justify-between">
+                                                        <span className="label-text text-xs font-bold text-gray-500 uppercase">Metode & Bentuk Pembelajaran</span>
+                                                        <span className="text-[10px] text-gray-400">Pilih maks 5 metode</span>
+                                                    </label>
+
+                                                    <div className="flex flex-wrap gap-1 mb-2">
+                                                        {metodePembelajaran.slice(0, 5).map(m => (
+                                                            <label key={m} className={`text-[10px] px-2 py-1 rounded-full cursor-pointer border transition-all ${(row.metode_pembelajaran || []).includes(m)
+                                                                ? 'bg-purple-100 border-purple-300 text-purple-700 font-semibold'
+                                                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
                                                                 }`}>
-                                                                <input type="checkbox" checked={row.bentuk_pembelajaran?.includes('daring')} onChange={() => toggleBentukPembelajaran(index, 'daring')} className="hidden" />
-                                                                <span className="font-bold text-xs">D</span>
+                                                                <input type="checkbox" checked={(row.metode_pembelajaran || []).includes(m)} onChange={() => toggleMultiSelect(index, 'metode_pembelajaran', m, 5)} className="hidden" />
+                                                                {m}
                                                             </label>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="flex gap-2">
+                                                        <div className="join w-full">
+                                                            <button
+                                                                className={`join-item btn btn-sm flex-1 ${!(row.link_daring) ? 'btn-active btn-neutral' : 'btn-outline'}`}
+                                                                onClick={() => updateRow(index, 'link_daring', '')}
+                                                            >Luring</button>
+                                                            <button
+                                                                className={`join-item btn btn-sm flex-1 ${(row.link_daring) ? 'btn-active btn-primary' : 'btn-outline'}`}
+                                                                onClick={() => updateRow(index, 'link_daring', 'https://meet.google.com')} // Placeholder
+                                                            >Daring</button>
                                                         </div>
-                                                    </td>
-
-                                                    {/* Bobot */}
-                                                    <td className="px-2 py-2 align-top">
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            max="100"
-                                                            value={row.bobot_penilaian}
-                                                            onChange={e => updateRow(index, 'bobot_penilaian', e.target.value)}
-                                                            className="w-full px-1 py-1 border rounded text-xs text-center dark:bg-gray-800"
-                                                        />
-                                                    </td>
-
-                                                    {/* Actions */}
-                                                    <td className="px-2 py-2 align-top text-center">
-                                                        <button
-                                                            onClick={() => removeWeek(index)}
-                                                            disabled={row.is_uts || row.is_uas}
-                                                            className="text-gray-400 hover:text-red-600 disabled:opacity-20 transition-colors p-1"
-                                                            title="Hapus Baris"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                                        <div className="join">
+                                                            <button
+                                                                className={`join-item btn btn-sm ${row.bentuk_pembelajaran?.includes('Kuliah') ? 'btn-active' : 'btn-outline'}`}
+                                                                onClick={() => toggleBentukPembelajaran(index, 'Kuliah')}
+                                                            >K</button>
+                                                            <button
+                                                                className={`join-item btn btn-sm ${row.bentuk_pembelajaran?.includes('Diskusi') ? 'btn-active' : 'btn-outline'}`}
+                                                                onClick={() => toggleBentukPembelajaran(index, 'Diskusi')}
+                                                            >D</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                             <div className="flex gap-4 text-xs text-gray-500">
                                 <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-800 rounded-sm"></span> L = Luring (Tatap Muka)</span>
@@ -1157,52 +2148,121 @@ export default function RPSEditorPage() {
                         </div>
                     )}
 
-                    {/* Section: Info Tambahan */}
-                    {activeSection === 'tambahan' && (
+
+
+                    {/* Section: Pustaka & Media */}
+                    {activeSection === 'pustaka' && (
                         <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="label">Pustaka Utama</label>
-                                    <textarea value={pustakaUtama} onChange={e => setPustakaUtama(e.target.value)} className="input w-full" rows="4" placeholder="Daftar pustaka utama..." />
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div className="space-y-4">
+                                    <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                                        <BookOpen className="text-blue-500" size={20} />
+                                        Pustaka (Referensi)
+                                    </h3>
+                                    <div>
+                                        <label className="label text-xs font-bold uppercase text-gray-400 italic">Pustaka Utama</label>
+                                        <textarea
+                                            value={formData.pustaka_utama}
+                                            onChange={e => setFormData({ ...formData, pustaka_utama: e.target.value })}
+                                            className="input w-full min-h-[150px] py-3 text-sm"
+                                            placeholder="Daftar pustaka utama..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="label text-xs font-bold uppercase text-gray-400 italic">Pustaka Pendukung</label>
+                                        <textarea
+                                            value={formData.pustaka_pendukung}
+                                            onChange={e => setFormData({ ...formData, pustaka_pendukung: e.target.value })}
+                                            className="input w-full min-h-[150px] py-3 text-sm"
+                                            placeholder="Daftar pustaka pendukung..."
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="label">Pustaka Pendukung</label>
-                                    <textarea value={pustakaPendukung} onChange={e => setPustakaPendukung(e.target.value)} className="input w-full" rows="4" placeholder="Daftar pustaka pendukung..." />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="label">Media Pembelajaran - Software</label>
-                                    <input type="text" value={mediaSoftware} onChange={e => setMediaSoftware(e.target.value)} className="input w-full" placeholder="Contoh: VS Code, Python, dll" />
-                                </div>
-                                <div>
-                                    <label className="label">Media Pembelajaran - Hardware</label>
-                                    <input type="text" value={mediaHardware} onChange={e => setMediaHardware(e.target.value)} className="input w-full" placeholder="Contoh: Laptop, Proyektor, dll" />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="label">Ambang Batas Kelulusan Mahasiswa (%)</label>
-                                    <input type="number" min="0" max="100" value={ambangKelulusanMhs} onChange={e => setAmbangKelulusanMhs(e.target.value)} className="input w-full" />
-                                </div>
-                                <div>
-                                    <label className="label">Ambang Batas Kelulusan MK (%)</label>
-                                    <input type="number" min="0" max="100" value={ambangKelulusanMK} onChange={e => setAmbangKelulusanMK(e.target.value)} className="input w-full" />
+
+                                <div className="space-y-4">
+                                    <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                                        <Monitor className="text-purple-500" size={20} />
+                                        Media Pembelajaran
+                                    </h3>
+                                    <div>
+                                        <label className="label text-xs font-bold uppercase text-gray-400 italic">Software (Perangkat Lunak)</label>
+                                        <textarea
+                                            value={formData.media_software}
+                                            onChange={e => setFormData({ ...formData, media_software: e.target.value })}
+                                            className="input w-full min-h-[150px] py-3 text-sm"
+                                            placeholder="Contoh: VS Code, MySQL Workbench, Figma..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="label text-xs font-bold uppercase text-gray-400 italic">Hardware (Perangkat Keras)</label>
+                                        <textarea
+                                            value={formData.media_hardware}
+                                            onChange={e => setFormData({ ...formData, media_hardware: e.target.value })}
+                                            className="input w-full min-h-[150px] py-3 text-sm"
+                                            placeholder="Contoh: Laptop, Proyektor, Lab Komputer..."
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     )}
+
+                    {/* Section: Info Tambahan */}
+
                 </div>
             </div>
 
             {/* Footer Actions */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t p-4 z-40 flex justify-end gap-3 shadow-lg lg:pl-64">
-                <button onClick={() => navigate(-1)} className="btn btn-ghost">Batal</button>
-                <button onClick={handleSaveDraft} disabled={loading || !formData.mata_kuliah_id} className="btn btn-primary flex items-center gap-2">
-                    <Save size={18} />
-                    {loading ? 'Menyimpan...' : (currentRPSId ? 'Simpan Perubahan' : 'Simpan Draft RPS')}
-                </button>
+            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t p-4 z-40 flex items-center justify-between shadow-lg lg:pl-64 font-sans">
+                <div className="flex items-center gap-4">
+                    {formData.mata_kuliah_id && (
+                        <div className="text-sm text-gray-500">
+                            Total Bobot: <span className={`font-bold ${totalBobot === 100 ? 'text-green-600' : 'text-red-600'}`}>
+                                {totalBobot}%
+                            </span>
+                        </div>
+                    )}
+                    {currentRPSId && (
+                        <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">
+                            <span className={`w-2 h-2 rounded-full ${formData.status === 'approved' ? 'bg-green-500' : formData.status === 'submitted' ? 'bg-orange-500' : 'bg-gray-400'}`}></span>
+                            Status: {formData.status || 'draft'}
+                        </div>
+                    )}
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={() => navigate(-1)} className="btn btn-ghost">Batal</button>
+
+                    <button
+                        onClick={handleSaveDraft}
+                        disabled={loading || !formData.mata_kuliah_id || (formData.status && formData.status !== 'draft')}
+                        className="btn btn-outline flex items-center gap-2"
+                    >
+                        <Cloud size={18} />
+                        Simpan Draft
+                    </button>
+
+                    <button
+                        onClick={handleSaveToServer}
+                        disabled={loading || !formData.mata_kuliah_id || (formData.status && formData.status !== 'draft')}
+                        className="btn btn-primary flex items-center gap-2 px-8"
+                    >
+                        <Save size={18} />
+                        {loading ? 'Menyimpan...' : (formData.status && formData.status !== 'draft' ? `Terkunci (${formData.status})` : (currentRPSId ? 'Simpan Perubahan' : 'Terbitkan RPS'))}
+                    </button>
+
+                    {currentRPSId && formData.status === 'draft' && (
+                        <button
+                            onClick={handleSubmitToApproval}
+                            disabled={loading || totalBobot !== 100}
+                            className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-6 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+                            title={totalBobot !== 100 ? "Total bobot harus 100% untuk diajukan" : ""}
+                        >
+                            <CheckCircle size={18} />
+                            Ajukan Approval
+                        </button>
+                    )}
+                </div>
             </div>
-        </div>
+        </div >
     );
 }

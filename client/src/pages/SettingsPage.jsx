@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Camera, User, Plus, Edit, Check, X, Calendar } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
 import useThemeStore from '../store/useThemeStore';
+import useAcademicStore from '../store/useAcademicStore';
 import axios from '../lib/axios';
 import { ROLES } from '../utils/permissions';
 
@@ -50,7 +51,7 @@ export default function SettingsPage() {
         }
     };
 
-    const handlePhotoChange = (e) => {
+    const handlePhotoChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
@@ -59,12 +60,31 @@ export default function SettingsPage() {
             return;
         }
 
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-            setPreviewUrl(img.src);
-            setMessage({ type: 'success', text: 'Foto berhasil diperbarui (Simulasi)' });
-        };
+        // Immediate upload
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        setLoading(true);
+        try {
+            const response = await axios.post('/auth/profile-picture', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            // Update user in store
+            updateUser(response.data.user);
+
+            // Update preview
+            setPreviewUrl(response.data.user.foto_profil);
+
+            setMessage({ type: 'success', text: 'Foto profil berhasil diperbarui' });
+        } catch (error) {
+            console.error('Upload error:', error);
+            setMessage({ type: 'error', text: error.response?.data?.message || 'Gagal mengupload foto' });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleUpdateProfile = async (e) => {
@@ -127,8 +147,17 @@ export default function SettingsPage() {
 
     const handleActivateYear = async (id, semester) => {
         try {
-            await axios.put(`/academic-years/${id}/activate`, { active_semester: semester });
+            const response = await axios.put(`/academic-years/${id}/activate`, { active_semester: semester });
             fetchAcademicYears();
+
+            // Sync with global academic store
+            const activatedYear = response.data;
+            if (activatedYear) {
+                const { setSemester, setYear } = useAcademicStore.getState();
+                setSemester(semester);
+                setYear(activatedYear.name);
+            }
+
             setMessage({ type: 'success', text: `Tahun ${semester} berhasil diaktifkan` });
         } catch (error) {
             setMessage({ type: 'error', text: 'Gagal mengaktifkan tahun akademik' });
@@ -158,14 +187,7 @@ export default function SettingsPage() {
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                             Informasi Profil
                         </h2>
-                        {!isEditing && (
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400"
-                            >
-                                Edit Profil
-                            </button>
-                        )}
+
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -200,63 +222,40 @@ export default function SettingsPage() {
 
                         {/* Right: Info */}
                         <div className="flex-1 w-full">
-                            {isEditing ? (
-                                <form onSubmit={handleUpdateProfile} className="space-y-4">
-                                    <div>
-                                        <label className="label">Nama Lengkap</label>
-                                        <input
-                                            type="text"
-                                            value={formData.nama_lengkap}
-                                            onChange={(e) => setFormData({ ...formData, nama_lengkap: e.target.value })}
-                                            className="input"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="label">Email</label>
-                                        <input
-                                            type="email"
-                                            value={formData.email}
-                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className="input"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="flex gap-3 pt-2">
-                                        <button type="submit" disabled={loading} className="btn btn-primary btn-sm">
-                                            Simpan
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsEditing(false)}
-                                            className="btn btn-secondary btn-sm"
-                                        >
-                                            Batal
-                                        </button>
-                                    </div>
-                                </form>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div>
-                                        <p className="text-sm text-gray-500">Nama Lengkap</p>
-                                        <p className="font-medium text-gray-900 dark:text-white text-lg">{user?.nama_lengkap}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Email</p>
-                                        <p className="text-gray-900 dark:text-white">{user?.email}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Username</p>
-                                        <p className="text-gray-900 dark:text-white font-mono text-sm">{user?.username}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-500">Role</p>
-                                        <span className="inline-flex mt-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-                                            {user?.role === ROLES.KAPRODI ? 'Ketua Program Studi' : 'Dosen'}
-                                        </span>
-                                    </div>
+                            { /* Always show form */}
+                            <form onSubmit={handleUpdateProfile} className="space-y-4">
+                                <div>
+                                    <label className="label">Nama Lengkap</label>
+                                    <input
+                                        type="text"
+                                        value={formData.nama_lengkap}
+                                        onChange={(e) => setFormData({ ...formData, nama_lengkap: e.target.value })}
+                                        className="input"
+                                        required
+                                    />
                                 </div>
-                            )}
+                                <div>
+                                    <label className="label">Email</label>
+                                    <input
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                        className="input"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-1">Role</p>
+                                    <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
+                                        {user?.role === ROLES.KAPRODI ? 'Ketua Program Studi' : 'Dosen'}
+                                    </span>
+                                </div>
+                                <div className="pt-2">
+                                    <button type="submit" disabled={loading} className="btn btn-primary">
+                                        {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -321,8 +320,8 @@ export default function SettingsPage() {
                                                 <button
                                                     onClick={() => handleActivateYear(year.id, 'Ganjil')}
                                                     className={`px-3 py-1 rounded text-xs border ${year.is_active && year.active_semester === 'Ganjil'
-                                                            ? 'bg-primary-600 text-white border-primary-600 cursor-default'
-                                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                        ? 'bg-primary-600 text-white border-primary-600 cursor-default'
+                                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                                                         }`}
                                                     disabled={year.is_active && year.active_semester === 'Ganjil'}
                                                 >
@@ -333,8 +332,8 @@ export default function SettingsPage() {
                                                 <button
                                                     onClick={() => handleActivateYear(year.id, 'Genap')}
                                                     className={`px-3 py-1 rounded text-xs border ${year.is_active && year.active_semester === 'Genap'
-                                                            ? 'bg-primary-600 text-white border-primary-600 cursor-default'
-                                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                        ? 'bg-primary-600 text-white border-primary-600 cursor-default'
+                                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                                                         }`}
                                                     disabled={year.is_active && year.active_semester === 'Genap'}
                                                 >

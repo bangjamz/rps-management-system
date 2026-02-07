@@ -1,4 +1,4 @@
-import { RPS, RPSPertemuan, MataKuliah, User, DosenAssignment, Prodi } from '../models/index.js';
+import { RPS, RPSPertemuan, MataKuliah, User, DosenAssignment, Prodi, CPL, CPMK, Fakultas } from '../models/index.js';
 import { ROLES } from '../middleware/auth.js';
 
 /**
@@ -97,7 +97,16 @@ export const getRPSByCourse = async (req, res) => {
                 {
                     model: MataKuliah,
                     as: 'mata_kuliah',
-                    attributes: ['id', 'kode_mk', 'nama_mk', 'sks']
+                    attributes: ['id', 'kode_mk', 'nama_mk', 'sks'],
+                    include: [{
+                        model: Prodi,
+                        as: 'prodi',
+                        include: [{
+                            model: Fakultas,
+                            as: 'fakultas',
+                            attributes: ['id', 'nama']
+                        }]
+                    }]
                 },
                 {
                     model: User,
@@ -118,7 +127,9 @@ export const getRPSByCourse = async (req, res) => {
             return res.status(404).json({ message: 'No RPS found for this course' });
         }
 
-        res.json(rps);
+        const rpsWithInclusions = await resolveRPSInclusions(rps);
+
+        res.json(rpsWithInclusions);
     } catch (error) {
         console.error('Get RPS by course error:', error);
         res.status(500).json({ message: 'Failed to retrieve RPS for course' });
@@ -144,7 +155,7 @@ export const getVersionsByCourse = async (req, res) => {
                 },
                 {
                     model: User,
-                    as: 'approved_by_user',
+                    as: 'approver',
                     attributes: ['id', 'nama_lengkap']
                 }
             ],
@@ -179,7 +190,11 @@ export const getRPSById = async (req, res) => {
                     include: [{
                         model: Prodi,
                         as: 'prodi',
-                        attributes: ['id', 'kode', 'nama']
+                        include: [{
+                            model: Fakultas,
+                            as: 'fakultas',
+                            attributes: ['id', 'nama']
+                        }]
                     }]
                 },
                 {
@@ -223,7 +238,9 @@ export const getRPSById = async (req, res) => {
             return res.status(403).json({ message: 'Access denied to this RPS' });
         }
 
-        res.json(rps);
+        const rpsWithInclusions = await resolveRPSInclusions(rps);
+
+        res.json(rpsWithInclusions);
     } catch (error) {
         console.error('Get RPS by ID error:', error);
         res.status(500).json({ message: 'Failed to retrieve RPS details' });
@@ -300,6 +317,8 @@ export const createRPS = async (req, res) => {
             deskripsi_mk,
             capaian_pembelajaran,
             prasyarat,
+            cpl_ids: req.body.cpl_ids || [],
+            cpmk_ids: req.body.cpmk_ids || [],
             status: 'draft'
         });
 
@@ -311,11 +330,74 @@ export const createRPS = async (req, res) => {
             ]
         });
 
-        res.status(201).json(fullRPS);
+        const rpsWithInclusions = await resolveRPSInclusions(fullRPS);
+
+        res.status(201).json(rpsWithInclusions);
     } catch (error) {
         console.error('Create RPS error:', error);
         res.status(500).json({ message: 'Failed to create RPS' });
     }
+};
+
+/**
+ * Helper to resolve JSON IDs to full objects
+ * @param {Object} rps - The RPS instance
+ * @returns {Object} - RPS with included objects
+ */
+const resolveRPSInclusions = async (rps) => {
+    if (!rps) return rps;
+
+    const rpsJson = rps.toJSON ? rps.toJSON() : rps;
+
+    // Helper to ensure we have an array of IDs
+    const ensureArray = (val) => {
+        if (!val) return [];
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string') {
+            try {
+                const parsed = JSON.parse(val);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+                return [];
+            }
+        }
+        return [];
+    };
+
+    const cplIds = ensureArray(rpsJson.cpl_ids);
+    const cpmkIds = ensureArray(rpsJson.cpmk_ids);
+
+    // Resolve CPLs
+    if (cplIds.length > 0) {
+        try {
+            rpsJson.cpl = await CPL.findAll({
+                where: { id: cplIds },
+                attributes: ['id', 'kode_cpl', 'deskripsi']
+            });
+        } catch (e) {
+            console.error('Error resolving CPLs:', e);
+            rpsJson.cpl = [];
+        }
+    } else {
+        rpsJson.cpl = [];
+    }
+
+    // Resolve CPMKs
+    if (cpmkIds.length > 0) {
+        try {
+            rpsJson.cpmk = await CPMK.findAll({
+                where: { id: cpmkIds },
+                attributes: ['id', 'kode_cpmk', 'deskripsi', 'cpl_id']
+            });
+        } catch (e) {
+            console.error('Error resolving CPMKs:', e);
+            rpsJson.cpmk = [];
+        }
+    } else {
+        rpsJson.cpmk = [];
+    }
+
+    return rpsJson;
 };
 
 /**
@@ -348,7 +430,7 @@ export const updateRPS = async (req, res) => {
         }
 
         // Update allowed fields
-        const allowedFields = ['deskripsi_mk', 'capaian_pembelajaran', 'prasyarat', 'referensi'];
+        const allowedFields = ['deskripsi_mk', 'capaian_pembelajaran', 'prasyarat', 'referensi', 'cpl_ids', 'cpmk_ids', 'rumpun_mk'];
         allowedFields.forEach(field => {
             if (updates[field] !== undefined) {
                 rps[field] = updates[field];
@@ -365,7 +447,9 @@ export const updateRPS = async (req, res) => {
             ]
         });
 
-        res.json(updated);
+        const rpsWithInclusions = await resolveRPSInclusions(updated);
+
+        res.json(rpsWithInclusions);
     } catch (error) {
         console.error('Update RPS error:', error);
         res.status(500).json({ message: 'Failed to update RPS' });
@@ -400,7 +484,16 @@ export const submitRPS = async (req, res) => {
             });
         }
 
-        rps.status = 'pending';
+        // Auto-approve if user is KAPRODI (and it's for their prodi - implicit since they are owner/creator)
+        if (user.role === ROLES.KAPRODI) {
+            rps.status = 'approved';
+            rps.approved_by = user.id;
+            rps.approved_at = new Date();
+            rps.catatan_approval = 'Auto-approved by Kaprodi (Self-submission)';
+        } else {
+            rps.status = 'pending';
+        }
+
         rps.submitted_at = new Date();
         await rps.save();
 
@@ -443,10 +536,10 @@ export const approveRPS = async (req, res) => {
             return res.status(403).json({ message: 'You can only approve RPS for your prodi' });
         }
 
-        // Only pending can be approved
-        if (rps.status !== 'pending') {
+        // Allow 'pending' OR 'draft' to be approved (force approval)
+        if (!['pending', 'draft'].includes(rps.status)) {
             return res.status(400).json({
-                message: 'Only pending RPS can be approved',
+                message: 'Only pending or draft RPS can be approved',
                 currentStatus: rps.status
             });
         }
@@ -509,10 +602,10 @@ export const rejectRPS = async (req, res) => {
             return res.status(403).json({ message: 'You can only reject RPS for your prodi' });
         }
 
-        // Only pending can be rejected
-        if (rps.status !== 'pending') {
+        // Allow 'pending' OR 'draft' to be rejected
+        if (!['pending', 'draft'].includes(rps.status)) {
             return res.status(400).json({
-                message: 'Only pending RPS can be rejected',
+                message: 'Only pending or draft RPS can be rejected',
                 currentStatus: rps.status
             });
         }

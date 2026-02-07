@@ -101,9 +101,21 @@ export default function DosenCoursesPage() {
                                                 RPS: {rps.status}
                                             </span>
                                         ) : (
-                                            <span className="text-xs px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">
-                                                RPS: Belum Dibuat
-                                            </span>
+                                            // Check if ANY RPS exists for this course (wrong semester/year)
+                                            rpsList.some(r => r.mata_kuliah_id === assignment.mata_kuliah.id) ? (
+                                                <div className="flex flex-col items-start gap-1">
+                                                    <span className="text-xs px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-200">
+                                                        RPS: Beda Semester
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400">
+                                                        Cek semester/tahun di RPS
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">
+                                                    RPS: Belum Dibuat
+                                                </span>
+                                            )
                                         )}
                                     </div>
                                 </div>

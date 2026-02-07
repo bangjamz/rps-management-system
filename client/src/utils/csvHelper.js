@@ -8,19 +8,27 @@
  * @param {string} type - 'cpl', 'cpmk', or 'sub-cpmk'
  * @returns {string} CSV content
  */
-export const generateCSVTemplate = (type) => {
+export const generateCSVTemplate = (type, userUnit = '') => {
     const templates = {
         cpl: {
-            headers: ['kode_cpl', 'deskripsi', 'keterangan', 'kategori'],
-            example: ['CPL01', 'Bertakwa kepada Tuhan Yang Maha Esa dan mampu menunjukkan sikap religious.', 'S01', 'Sikap'],
+            headers: ['kode_cpl', 'deskripsi', 'keterangan', 'kategori', 'level', 'unit_name'],
+            example: ['CPL01', 'Bertakwa kepada Tuhan Yang Maha Esa...', 'S01', 'Sikap', 'prodi', userUnit || 'Informatika'],
         },
         cpmk: {
-            headers: ['kode_cpmk', 'deskripsi', 'kode_cpl', 'kode_mk'],
-            example: ['CPMK011', 'Mengembangkan pemahaman dan penghargaan terhadap ajaran agama dalam konteks global.', 'CPL01', 'MK38'],
+            headers: ['kode_cpmk', 'deskripsi', 'kode_cpl', 'kode_mk', 'level', 'unit_name'],
+            example: ['CPMK011', 'Mengembangkan pemahaman...', 'CPL01', 'MK38', 'prodi', userUnit || 'Informatika'],
         },
         'sub-cpmk': {
-            headers: ['kode_sub_cpmk', 'deskripsi', 'kode_cpmk', 'bobot_persen'],
-            example: ['SUBCPMK0111', 'Memahami konsep dasar ajaran agama', 'CPMK011', '50'],
+            headers: ['kode_sub_cpmk', 'deskripsi', 'kode_cpmk', 'kode_mk', 'bobot_persen', 'level', 'unit_name'],
+            example: ['SUBCPMK0111', 'Memahami konsep dasar...', 'CPMK011', 'MK38', '50', 'prodi', userUnit || 'Informatika'],
+        },
+        'bahan-kajian': {
+            headers: ['kode_bk', 'jenis', 'deskripsi', 'bobot_min', 'bobot_max', 'level', 'unit_name'],
+            example: ['BK01', 'Bahan Kajian...', 'Social Issues...', '2', '4', 'prodi', userUnit || 'Informatika'],
+        },
+        'mk': {
+            headers: ['kode_mk', 'nama_mk', 'sks', 'semester', 'deskripsi', 'sks_teori', 'sks_praktek', 'jenis', 'level', 'unit_name'],
+            example: ['MK001', 'Algoritma...', '3', '1', '...', '2', '1', 'Wajib', 'prodi', userUnit || 'Informatika'],
         }
     };
 
@@ -29,9 +37,7 @@ export const generateCSVTemplate = (type) => {
 
     const csvRows = [
         template.headers.join(','),
-        template.example.join(','),
-        // Empty row for user to fill
-        template.headers.map(() => '').join(',')
+        template.example.join(',')
     ];
 
     return csvRows.join('\n');
@@ -41,14 +47,14 @@ export const generateCSVTemplate = (type) => {
  * Download CSV template
  * @param {string} type - 'cpl', 'cpmk', or 'sub-cpmk'
  */
-export const downloadCSVTemplate = (type) => {
-    const csv = generateCSVTemplate(type);
+export const downloadCSVTemplate = (type, userUnit = '') => {
+    const csv = generateCSVTemplate(type, userUnit);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
 
     link.setAttribute('href', url);
-    link.setAttribute('download', `template_${type}_${Date.now()}.csv`);
+    link.setAttribute('download', `Template_${type}_${Date.now()}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

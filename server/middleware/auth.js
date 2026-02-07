@@ -56,15 +56,18 @@ export const authenticate = async (req, res, next) => {
 
 // ========== BASIC ROLE AUTHORIZATION ==========
 export const authorize = (...roles) => {
+    // Flatten roles in case caller passes an array: authorize(['kaprodi', 'admin'])
+    const allowedRoles = roles.flat();
+
     return (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ message: 'Not authenticated' });
         }
 
-        if (!roles.includes(req.user.role)) {
+        if (!allowedRoles.includes(req.user.role)) {
             return res.status(403).json({
                 message: 'Insufficient permissions',
-                required: roles,
+                required: allowedRoles,
                 current: req.user.role
             });
         }

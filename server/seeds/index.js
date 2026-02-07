@@ -42,7 +42,7 @@ const runSeeder = async () => {
         console.log('─'.repeat(60));
 
         // Bahan Kajian
-        await seedBahanKajian();
+        await seedBahanKajian(prodiInformatika.id);
 
         // Mata Kuliah (for Informatika)
         const fakultasTeknik = fakultasList.find(f => f.kode === 'FT'); // Assuming Kode FT for Teknik, or based on index

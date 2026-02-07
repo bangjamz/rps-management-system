@@ -61,7 +61,7 @@ router.post('/', authorize(ROLES.DOSEN, ROLES.KAPRODI), createRPS);
 router.put('/:id', authorize(ROLES.DOSEN, ROLES.KAPRODI), updateRPSController);
 
 // Submit RPS for approval (dosen only)
-router.put('/:id/submit', authorize(ROLES.DOSEN), submitRPS);
+router.put('/:id/submit', authorize(ROLES.DOSEN, ROLES.KAPRODI), submitRPS);
 
 // Approve/reject RPS (kaprodi only)
 router.put('/:id/approve', authorize(ROLES.KAPRODI, ROLES.DEKAN), approveRPS);

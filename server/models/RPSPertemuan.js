@@ -15,6 +15,11 @@ const RPSPertemuan = sequelize.define('RPSPertemuan', {
         type: DataTypes.INTEGER,
         allowNull: false
     },
+    sampai_minggu_ke: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: 'If set, this pertemuan covers range from minggu_ke to sampai_minggu_ke'
+    },
     sub_cpmk_id: {
         type: DataTypes.STRING,
         allowNull: true,

@@ -1,0 +1,66 @@
+- [x] Phase 10: Advanced Import/Export & Hierarchy
+- [x] Phase 11: Final Polish & Verification
+- [x] Phase 12: UI Aesthetic Refinement (Tag Styling)
+- [x] Phase 13: MK View Refinement (Unit Visibility)
+- [x] Phase 14: MK SKS Column Separation
+- [x] Phase 15: MK Card UI Polish (SKS Layout)
+- [x] Phase 16: Unit Column Tag Styling
+- [x] Phase 17: Dynamic Tag Coloring
+- [x] Phase 18: Critical RPS Fixes (PDF Export & Data Integrity)
+    - [x] Debug and fix PDF Export from RPS View and Management pages
+    - [x] Fix missing CPL & CPMK data issue when viewing RPS after edits
+    - [x] Verify full RPS lifecycle (Create -> Edit -> View -> Export)
+- [x] Phase 19: RPS Editor Data Connectivity Fixes
+    - [x] Handle resolved CPMK/CPL data in frontend for robust lookups
+    - [x] Fix redundant/conflicting fetchCPLs calls in RPSEditorPage
+    - [x] Ensure CPMK column in Weekly Schedule and Sub-CPMK table is correctly populated
+- [x] Phase 21: RPS View Page Sub-CPMK Table Refinement
+    - [x] Update backend to include `cpl_id` in resolved CPMK objects
+    - [x] Update `RPSViewPage.jsx` to match editor layout (Kode | CPL | Deskripsi | CPMK Terkait)
+    - [x] Implement CPL lookup in view page
+- [x] Phase 22: RPS View & Edit UI Refinements
+    - [x] **View Page**: Ensure Sub-CPMK column order (Kode | CPL | Deskripsi | CPMK)
+    - [x] **View Page**: Improve Weekly Plan formatting (Grid/Sub-rows for Bentuk/Metode)
+    - [x] **View Page**: Clean up JSON artifacts (`[""]`, `[^^]`) in View
+    - [x] **View Page**: Verify/Add "Metode Penilaian" display
+    - [x] **Editor Page**: Increase row height (use textarea) for Weekly Plan inputs
+    - [x] **Editor Page**: Fix `%` column visibility width
+- [x] Phase 23: RPS Editor Weekly Plan Overhaul
+    - [x] Refactor Weekly Plan UI to "Card/Stacked" layout per week (vertical editing)
+    - [x] Implement "Tambah UTS" and "Tambah UAS" buttons with specific flags
+    - [x] Adjust "%" input width in the new layout
+    - [x] Clean up narrow column constraints
+    - [x] **Sanitization**: Fix JSON artifacts (`["[]"]`) by robustly parsing data on load and clean on view.
+- [x] Phase 24: Sub-CPMK Driver Flow & UI Fixes
+    - [x] **View Page**: Move CPL column to right, fix "Metode Penilaian", Text wrap headers
+    - [x] **Editor**: Move Sub-CPMK management to dedicated Tab
+    - [x] **Editor**: Add `estimasi_minggu` and Reordering (Up/Down) to Sub-CPMK
+    - [x] **Editor**: Implement "Generate Weekly Plan" from Sub-CPMK list
+
+- [x] **Phase 34: Debugging Save 500 Error**
+    - [x] Improve client-side error reporting (alert specific server error)
+    - [x] Identify root cause (syntax error in controller & potential logic flaw)
+    - [x] Fix syntax error in `rpsDosenController.js`
+    - [x] Add debug logging to `bulkUpsertPertemuan`
+    - [x] Verify fix with user
+- [x] **Phase 35: Fix Invalid ID Syntax Error**
+    - [x] Identify cause: temporary client IDs ("uts-...") treated as DB integers
+    - [x] Implement strict integer validation in `bulkUpsertPertemuan`
+    - [x] Update orphan deletion logic to ignore temp IDs
+- [x] **Phase 36: Styling UTS/UAS Rows**
+    - [x] Update `RPSEditorPage.jsx` to render UTS/UAS as merged, yellow rows
+    - [x] Ensure Week and Bobot remain editable in merged view
+- [x] **Phase 37: UTS/UAS Styling Sync (Editor & View)**
+    - [x] Fix `RPSViewPage.jsx` to match Editor's merged style
+    - [x] Allow editing of Week in Editor (remove `readOnly`)
+- [x] **Phase 38: Fix Data Mapping (is_uts vs jenis_pertemuan)**
+    - [x] Fix Backend: Derive `jenis_pertemuan` from `is_uts/is_uas` and SAVE it
+    - [x] Fix Frontend Editor: Map `jenis_pertemuan` back to `is_uts/is_uas` flags
+    - [x] Fix Frontend Viewer: Use `jenis_pertemuan` for correct rendering
+- [x] **Phase 39: Fix PDF Export for Evaluation Methods**
+    - [x] Update `rpsExport.js` to iterate over methods
+    - [x] Render Rubrics as proper tables
+    - [x] Render text descriptions clearly
+- [x] **Phase 40: Reorder PDF Sections**
+    - [x] Move "Metode Penilaian" to end of PDF
+    - [x] Add page break before "Metode Penilaian"

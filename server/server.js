@@ -16,7 +16,6 @@ import analyticsRoutes from './routes/analytics.js';
 import cplAnalyticsRoutes from './routes/cplAnalytics.js';
 import notificationRoutes from './routes/notifications.js';
 import academicYearRoutes from './routes/academicYears.js';
-import curriculumRoutes from './routes/curriculum.js';
 
 // Load environment variables
 dotenv.config();
@@ -26,11 +25,28 @@ const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc)
+        if (!origin) return callback(null, true);
+
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'http://localhost:3000',
+            process.env.CLIENT_URL
+        ].filter(Boolean);
+
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(null, true); // Allow all origins in development
+        }
+    },
     credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -47,7 +63,6 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/cpl-analytics', cplAnalyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/academic-years', academicYearRoutes);
-app.use('/api/curriculum', curriculumRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

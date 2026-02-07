@@ -34,7 +34,17 @@ const MataKuliah = sequelize.define('MataKuliah', {
     sks: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        defaultValue: 3
+        defaultValue: 0
+    },
+    sks_teori: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+    },
+    sks_praktek: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
     },
     semester: {
         type: DataTypes.INTEGER,

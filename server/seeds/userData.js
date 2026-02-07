@@ -61,7 +61,7 @@ export const seedUsers = async (institusiId, fakultasList, prodiList) => {
             email: 'kaprodi.if@mahardika.ac.id',
             password_hash: hashedPassword,
             role: 'kaprodi',
-            nama_lengkap: 'Dr. Budi Santoso, S.Kom, M.Kom',
+            nama_lengkap: 'Dr. Indra Surya Permana, MM., M.Kom.',
             prodi_id: prodiMap.IF.id,
             is_active: true
         },
@@ -229,7 +229,7 @@ export const seedUsers = async (institusiId, fakultasList, prodiList) => {
             email: 'mahasiswa.budi@mahardika.ac.id',
             password_hash: hashedPassword,
             role: 'mahasiswa',
-            nama_lengkap: 'Budi Santoso',
+            nama_lengkap: 'Bagus Santoso',
             nim: '10115002',
             angkatan: 2023,
             telepon: '081234567902',

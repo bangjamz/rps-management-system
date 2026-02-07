@@ -125,10 +125,26 @@
 - [x] View Options
   - [x] Toggle Table/Card/List view for Curriculum Data
 
-## Known Issues & Fixes Log (2024-02-04)
+## Phase 6.9: Curriculum Code System Enhancement (2026-02-06) ✅
+- [x] Dual Code System Implementation
+  - [x] Separation of Display Code (`CPL01`) and Internal Unique Code (`IF-CPL01`)
+  - [x] Automatic Prodi-based prefixing (IF, KEP, KEB, RMIK, dll)
+  - [x] Duplicate detection with automatic suffixing (suffix `(1)`, `(2)`, etc.)
+- [x] Database & Model Updates
+  - [x] Added `kode_tampilan` to 4 models (CPL, BK, CPMK, SubCPMK)
+  - [x] Migrated existing data (82+ records updated)
+- [x] UI/UX Improvements
+  - [x] Hover tooltips for internal codes in tables
+  - [x] Hover tooltips for long descriptions in dropdowns
+  - [x] Role-based filtering (Super Admin vs Kaprodi)
+
+## Known Issues & Fixes Log
 | Issue | Status | Solution |
 |-------|--------|----------|
 | getCurriculumTree 500 error | ✅ Fixed | Changed column 'kode' to 'kode_cpl', added required:false |
 | Edit RPS → "Buat RPS Baru" | ✅ Fixed | Added /rps/by-course endpoint, updated navigation logic |
 | Duplicate RPS error on save | ✅ Fixed | Check currentRPSId before create, use PUT for updates |
+| Column "kode_tampilan" NOT NULL error | ✅ Fixed | Made column nullable first, populated data, then (planned) NOT NULL |
+| Long text in dropdown truncated | ✅ Fixed | Added `title` attribute for native browser tooltip on hover |
+
 

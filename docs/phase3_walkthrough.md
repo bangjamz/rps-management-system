@@ -211,7 +211,7 @@ GET /api/auth/profile - Includes institusi, fakultas, prodi data
     "username": "kaprodi_informatika",
     "email": "kaprodi.if@mahardika.ac.id",
     "role": "kaprodi",
-    "nama_lengkap": "Dr. Budi Santoso, S.Kom, M.Kom",
+    "nama_lengkap": "Dr. Indra Surya Permana, MM., M.Kom.",
     "nidn": null,
     "telepon": null,
     "prodi_id": 1,

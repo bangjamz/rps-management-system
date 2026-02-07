@@ -1,4 +1,4 @@
-import { MataKuliah } from '../models/index.js';
+import { MataKuliah, DosenAssignment, User, Prodi, Fakultas, Institusi } from '../models/index.js';
 
 import { Op } from 'sequelize';
 
@@ -6,36 +6,89 @@ import { Op } from 'sequelize';
 export const getAllCourses = async (req, res) => {
     try {
         const user = req.user;
-        const prodiId = user.prodi_id;
-        // Get fakultas_id directly from user (Dekan) or from prodi (Dosen/Mahasiswa/Kaprodi)
-        const fakultasId = user.fakultas_id || user.prodi?.fakultas_id;
+        const { fakultasId, prodiId, semester } = req.query;
 
-        const whereClause = {
-            [Op.or]: [
-                // 1. Institusi Level (Visible to everyone)
-                { scope: 'institusi' },
+        console.log('DEBUG: getAllCourses', {
+            role: user.role,
+            userId: user.id,
+            userProdi: user.prodi_id,
+            querySem: semester,
+            queryFak: fakultasId,
+            queryProdi: prodiId
+        });
 
-                // 2. Fakultas Level (Visible if user belongs to that faculty)
-                ...(fakultasId ? [{
-                    scope: 'fakultas',
-                    fakultas_id: fakultasId
-                }] : []),
+        let whereClause = {};
 
-                // 3. Prodi Level (Visible if user belongs to that prodi)
-                ...(prodiId ? [{
-                    scope: 'prodi',
-                    prodi_id: prodiId
-                }] : [])
-            ]
+        // 1. Role-based Base Access Control & Filtering
+        // 1. Role-based Base Access Control & Filtering
+        if (user.role === 'admin_institusi' || user.role === 'admin') {
+            // Admin sees all, can filter by anything
+            if (fakultasId) whereClause.fakultas_id = fakultasId;
+            if (prodiId) whereClause.prodi_id = prodiId;
+
+        } else if (user.role === 'dekan') {
+            const userFakultasId = user.fakultas_id;
+            if (prodiId) {
+                whereClause.prodi_id = prodiId;
+            } else {
+                // Dekan sees courses in their faculty (both faculty-level and prodi-level)
+                whereClause[Op.or] = [
+                    { fakultas_id: userFakultasId },
+                    { '$prodi.fakultas_id$': userFakultasId }
+                ];
+            }
+
+        } else if (user.role === 'kaprodi') {
+            // Kaprodi strictly sees their prodi
+            whereClause.prodi_id = user.prodi_id;
+        } else {
+            // Dosen/Mahasiswa/Default
+            const userFakultasId = user.fakultas_id || user.prodi?.fakultas_id;
+            whereClause = {
+                [Op.or]: [
+                    { scope: 'institusi' },
+                    ...(userFakultasId ? [{ fakultas_id: userFakultasId }] : []),
+                    ...(user.prodi_id ? [{ prodi_id: user.prodi_id }] : [])
+                ]
+            };
+        }
+
+        // 2. Common Filter: Semester (ensure type safety)
+        if (semester) {
+            whereClause.semester = parseInt(semester);
+        }
+
+        // 3. Build Query Options
+        const queryOptions = {
+            where: whereClause,
+            include: [
+                {
+                    model: DosenAssignment,
+                    as: 'assignments',
+                    where: { is_active: true },
+                    required: false,
+                    include: [{
+                        model: User,
+                        as: 'dosen',
+                        attributes: ['id', 'nama_lengkap', 'nidn']
+                    }]
+                },
+                {
+                    model: Prodi,
+                    as: 'prodi',
+                    attributes: ['id', 'nama', 'fakultas_id'],
+                    required: false
+                },
+                { model: Fakultas, as: 'fakultas', attributes: ['id', 'nama'], required: false },
+                { model: Institusi, as: 'institusi', attributes: ['id', 'nama'], required: false }
+            ],
+            order: [['semester', 'ASC'], ['kode_mk', 'ASC']]
         };
 
-        // If user is Admin Institusi, show all
-        const finalWhere = user.role === 'admin_institusi' ? {} : whereClause;
+        console.log('DEBUG: Course Query Options', JSON.stringify(queryOptions, null, 2));
 
-        const courses = await MataKuliah.findAll({
-            where: finalWhere,
-            order: [['semester', 'ASC'], ['kode_mk', 'ASC']]
-        });
+        const courses = await MataKuliah.findAll(queryOptions);
+        console.log(`DEBUG: Found ${courses.length} courses`);
 
         res.json(courses);
     } catch (error) {
@@ -65,12 +118,17 @@ export const getCourseById = async (req, res) => {
 // Create course
 export const createCourse = async (req, res) => {
     try {
-        const { kode_mk, nama_mk, sks, semester, prodi_id } = req.body;
+        const { kode_mk, nama_mk, sks, sks_teori, sks_praktek, semester, prodi_id } = req.body;
+
+        // Auto-calculate Total SKS
+        const totalSks = sks || (parseInt(sks_teori || 0) + parseInt(sks_praktek || 0));
 
         const course = await MataKuliah.create({
             kode_mk,
             nama_mk,
-            sks,
+            sks: totalSks,
+            sks_teori: sks_teori || 0,
+            sks_praktek: sks_praktek || 0,
             semester,
             prodi_id: prodi_id || req.user.prodi_id
         });
@@ -86,7 +144,7 @@ export const createCourse = async (req, res) => {
 export const updateCourse = async (req, res) => {
     try {
         const { id } = req.params;
-        const { kode_mk, nama_mk, sks, semester, scope, fakultas_id, prodi_id } = req.body;
+        const { kode_mk, nama_mk, sks, sks_teori, sks_praktek, semester, scope, fakultas_id, prodi_id } = req.body;
 
         const course = await MataKuliah.findByPk(id);
 
@@ -94,10 +152,15 @@ export const updateCourse = async (req, res) => {
             return res.status(404).json({ message: 'Course not found' });
         }
 
+        // Auto-calculate Total SKS if not provided but Breakdown is
+        const totalSks = sks || ((parseInt(sks_teori || 0) + parseInt(sks_praktek || 0)) || course.sks);
+
         await course.update({
             kode_mk,
             nama_mk,
-            sks,
+            sks: totalSks,
+            sks_teori: sks_teori !== undefined ? sks_teori : course.sks_teori,
+            sks_praktek: sks_praktek !== undefined ? sks_praktek : course.sks_praktek,
             semester,
             scope,
             fakultas_id,

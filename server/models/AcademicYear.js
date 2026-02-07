@@ -10,9 +10,7 @@ const AcademicYear = sequelize.define('AcademicYear', {
     },
     name: {
         type: DataTypes.STRING(20),
-        allowNull: false,
-        unique: true,
-        comment: 'e.g., 2025/2026'
+        allowNull: false
     },
     is_active: {
         type: DataTypes.BOOLEAN,
@@ -20,8 +18,7 @@ const AcademicYear = sequelize.define('AcademicYear', {
     },
     active_semester: {
         type: DataTypes.ENUM('Ganjil', 'Genap'),
-        allowNull: true,
-        comment: 'Only relevant if is_active is true'
+        allowNull: true
     }
 }, {
     tableName: 'academic_years',

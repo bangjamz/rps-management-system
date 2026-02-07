@@ -83,48 +83,48 @@ export const seedCPL = async (prodiId, plList) => {
 };
 
 // Seed Bahan Kajian (BK)
-export const seedBahanKajian = async () => {
+export const seedBahanKajian = async (prodiId) => {
     const bkData = [
         // A - Bahan Kajian Wajib Informatika
-        { kode_bk: 'BK01', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Social Issues and Professional Practice', bobot_min: 2, bobot_max: 4, kode_kategori: 'A' },
-        { kode_bk: 'BK02', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Security Policy and Management', bobot_min: 2, bobot_max: 3, kode_kategori: 'A' },
-        { kode_bk: 'BK03', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Project Management', bobot_min: 2, bobot_max: 3, kode_kategori: 'A' },
-        { kode_bk: 'BK04', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'User Experience Design', bobot_min: 2, bobot_max: 4, kode_kategori: 'A' },
-        { kode_bk: 'BK05', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Security Issues and Principles', bobot_min: 2, bobot_max: 3, kode_kategori: 'A' },
-        { kode_bk: 'BK06', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Data and Information Management', bobot_min: 2, bobot_max: 4, kode_kategori: 'A' },
-        { kode_bk: 'BK07', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Parallel and Distributed Computing', bobot_min: 2, bobot_max: 4, kode_kategori: 'A' },
-        { kode_bk: 'BK08', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Computer Networks', bobot_min: 2, bobot_max: 4, kode_kategori: 'A' },
-        { kode_bk: 'BK09', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Security Technology and Implementation', bobot_min: 2, bobot_max: 4, kode_kategori: 'A' },
-        { kode_bk: 'BK10', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Software Design', bobot_min: 2, bobot_max: 4, kode_kategori: 'A' },
-        { kode_bk: 'BK11', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Operating Systems', bobot_min: 3, bobot_max: 5, kode_kategori: 'A' },
-        { kode_bk: 'BK12', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Data Structures, Algorithms and Complexity', bobot_min: 4, bobot_max: 5, kode_kategori: 'A' },
-        { kode_bk: 'BK13', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Programming Languages', bobot_min: 3, bobot_max: 5, kode_kategori: 'A' },
-        { kode_bk: 'BK14', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Programming Fundamentals', bobot_min: 4, bobot_max: 5, kode_kategori: 'A' },
-        { kode_bk: 'BK15', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Computing Systems Fundamentals', bobot_min: 2, bobot_max: 3, kode_kategori: 'A' },
-        { kode_bk: 'BK16', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Architecture and Organization', bobot_min: 3, bobot_max: 4, kode_kategori: 'A' },
-        { kode_bk: 'BK17', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Graphics and Visualization', bobot_min: 2, bobot_max: 4, kode_kategori: 'A' },
-        { kode_bk: 'BK18', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Intelligent Systems', bobot_min: 3, bobot_max: 5, kode_kategori: 'A' },
-        { kode_bk: 'BK19', jenis_bk: 'Bahan Kajian Wajib Informatika', bahan_kajian: 'Platform-based Development', bobot_min: 2, bobot_max: 4, kode_kategori: 'A' },
+        { prodi_id: prodiId, kode_bk: 'BK01', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Social Issues and Professional Practice', bobot_min: 2, bobot_max: 4 },
+        { prodi_id: prodiId, kode_bk: 'BK02', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Security Policy and Management', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK03', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Project Management', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK04', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'User Experience Design', bobot_min: 2, bobot_max: 4 },
+        { prodi_id: prodiId, kode_bk: 'BK05', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Security Issues and Principles', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK06', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Data and Information Management', bobot_min: 2, bobot_max: 4 },
+        { prodi_id: prodiId, kode_bk: 'BK07', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Parallel and Distributed Computing', bobot_min: 2, bobot_max: 4 },
+        { prodi_id: prodiId, kode_bk: 'BK08', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Computer Networks', bobot_min: 2, bobot_max: 4 },
+        { prodi_id: prodiId, kode_bk: 'BK09', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Security Technology and Implementation', bobot_min: 2, bobot_max: 4 },
+        { prodi_id: prodiId, kode_bk: 'BK10', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Software Design', bobot_min: 2, bobot_max: 4 },
+        { prodi_id: prodiId, kode_bk: 'BK11', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Operating Systems', bobot_min: 3, bobot_max: 5 },
+        { prodi_id: prodiId, kode_bk: 'BK12', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Data Structures, Algorithms and Complexity', bobot_min: 4, bobot_max: 5 },
+        { prodi_id: prodiId, kode_bk: 'BK13', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Programming Languages', bobot_min: 3, bobot_max: 5 },
+        { prodi_id: prodiId, kode_bk: 'BK14', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Programming Fundamentals', bobot_min: 4, bobot_max: 5 },
+        { prodi_id: prodiId, kode_bk: 'BK15', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Computing Systems Fundamentals', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK16', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Architecture and Organization', bobot_min: 3, bobot_max: 4 },
+        { prodi_id: prodiId, kode_bk: 'BK17', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Graphics and Visualization', bobot_min: 2, bobot_max: 4 },
+        { prodi_id: prodiId, kode_bk: 'BK18', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Intelligent Systems', bobot_min: 3, bobot_max: 5 },
+        { prodi_id: prodiId, kode_bk: 'BK19', jenis: 'Bahan Kajian Wajib Informatika', deskripsi: 'Platform-based Development', bobot_min: 2, bobot_max: 4 },
 
         // B - BK Tambahan (Opsional)
-        { kode_bk: 'BK20', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Computational Science', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK21', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Discrete Structures', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK22', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Human-Computer Interaction', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK23', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Information Assurance and Security', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK24', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Information Management', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK25', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Networking and Communications', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK26', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Software Development Fundamentals', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK27', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Software Engineering', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK28', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Systems Analysis & Design', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK29', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Virtual Systems and Services', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK30', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Software Quality, Verification and Validation', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
-        { kode_bk: 'BK31', jenis_bk: 'BK Tambahan (Opsional) Bidang Informatika', bahan_kajian: 'Software Modeling and Analysis', bobot_min: 2, bobot_max: 3, kode_kategori: 'B' },
+        { prodi_id: prodiId, kode_bk: 'BK20', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Computational Science', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK21', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Discrete Structures', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK22', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Human-Computer Interaction', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK23', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Information Assurance and Security', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK24', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Information Management', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK25', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Networking and Communications', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK26', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Software Development Fundamentals', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK27', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Software Engineering', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK28', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Systems Analysis & Design', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK29', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Virtual Systems and Services', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK30', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Software Quality, Verification and Validation', bobot_min: 2, bobot_max: 3 },
+        { prodi_id: prodiId, kode_bk: 'BK31', jenis: 'BK Tambahan (Opsional) Bidang Informatika', deskripsi: 'Software Modeling and Analysis', bobot_min: 2, bobot_max: 3 },
 
         // C - BK Wajib SN Dikti
-        { kode_bk: 'BK32', jenis_bk: 'BK Wajib SN Dikti', bahan_kajian: 'Pengembangan Diri', bobot_min: 2, bobot_max: 2, kode_kategori: 'C' },
+        { prodi_id: prodiId, kode_bk: 'BK32', jenis: 'BK Wajib SN Dikti', deskripsi: 'Pengembangan Diri', bobot_min: 2, bobot_max: 2 },
 
         // D - BK Wajib Umum
-        { kode_bk: 'BK33', jenis_bk: 'BK Wajib Umum', bahan_kajian: 'Metodologi Penelitian', bobot_min: 2, bobot_max: 6, kode_kategori: 'D' }
+        { prodi_id: prodiId, kode_bk: 'BK33', jenis: 'BK Wajib Umum', deskripsi: 'Metodologi Penelitian', bobot_min: 2, bobot_max: 6 }
     ];
 
     const bahanKajian = await BahanKajian.bulkCreate(bkData);

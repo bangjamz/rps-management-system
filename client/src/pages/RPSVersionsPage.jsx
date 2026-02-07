@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../lib/axios';
-import { FileText, Clock, User, Plus, Eye, History, ArrowRight, Layout } from 'lucide-react';
+import { FileText, Clock, User, Plus, Eye, History, ArrowRight, Layout, Check, RotateCcw } from 'lucide-react';
 
 import useAuthStore from '../store/useAuthStore';
 
@@ -52,9 +52,23 @@ export default function RPSVersionsPage() {
         }
     };
 
+    const handleApproveRPS = async (rpsId) => {
+        if (!window.confirm('Setujui RPS ini sebagai versi final untuk semester ini?')) return;
+
+        try {
+            await axios.put(`/rps/${rpsId}/approve`);
+            alert('RPS berhasil disetujui!');
+            loadData(); // Refresh list
+        } catch (error) {
+            console.error('Failed to approve RPS:', error);
+            alert(error.response?.data?.message || 'Gagal menyetujui RPS');
+        }
+    };
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'approved': return 'bg-green-100 text-green-700';
+            case 'submitted': return 'bg-orange-100 text-orange-700';
             case 'pending': return 'bg-amber-100 text-amber-700';
             case 'rejected': return 'bg-red-100 text-red-700';
             default: return 'bg-gray-100 text-gray-700';
@@ -127,12 +141,31 @@ export default function RPSVersionsPage() {
                                 <History className="w-5 h-5" />
                                 Riwayat Implementasi
                             </h2>
+                            {/* Button to create new RPS when nothing exists */}
+                            {versions.length === 0 && (
+                                <button
+                                    onClick={() => navigate(`${basePath}/rps/create?courseId=${courseId}`)}
+                                    className="btn btn-primary flex items-center gap-2"
+                                >
+                                    <Plus size={18} /> Buat RPS Baru
+                                </button>
+                            )}
                         </div>
 
                         {implementations.length === 0 ? (
                             <div className="card p-8 text-center bg-gray-50 border-dashed border-2 border-gray-200">
                                 <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                                <p className="text-gray-500">Belum ada RPS yang dibuat oleh dosen.</p>
+                                <p className="text-gray-500 mb-2">Belum ada RPS yang dibuat untuk mata kuliah ini.</p>
+                                <p className="text-xs text-gray-400 mb-4 max-w-xs mx-auto">
+                                    Jika Anda merasa sudah membuat RPS, pastikan Anda memilih mata kuliah yang benar.
+                                    Cek menu "Kelola RPS" di sidebar untuk melihat semua RPS yang pernah Anda buat.
+                                </p>
+                                <button
+                                    onClick={() => navigate(`${basePath}/rps/create?courseId=${courseId}`)}
+                                    className="btn btn-primary mx-auto flex items-center gap-2"
+                                >
+                                    <Plus size={18} /> Mulai Buat RPS
+                                </button>
                             </div>
                         ) : (
                             <div className="space-y-4">
@@ -186,6 +219,18 @@ export default function RPSVersionsPage() {
                                                     <Eye className="w-4 h-4" />
                                                     Lihat
                                                 </button>
+
+                                                {/* Kaprodi Action: Approve Submitted RPS */}
+                                                {user?.role === 'kaprodi' && rps.status === 'submitted' && (
+                                                    <button
+                                                        onClick={() => handleApproveRPS(rps.id)}
+                                                        className="btn btn-sm bg-green-600 hover:bg-green-700 text-white flex items-center gap-1"
+                                                    >
+                                                        <ArrowRight className="w-4 h-4" />
+                                                        Finalisasi / Setujui
+                                                    </button>
+                                                )}
+
                                                 {/* Only show Edit if not draft (draft has button above) or logic permits */}
                                                 {rps.status !== 'draft' && (
                                                     <button
@@ -230,9 +275,18 @@ export default function RPSVersionsPage() {
                                 )}
                             </div>
                         ) : (
-                            <p className="text-sm text-blue-800 dark:text-blue-200">
-                                Belum ada versi RPS. Silakan buat RPS baru melalui tombol di sebelah kiri.
-                            </p>
+                            <div>
+                                <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
+                                    Belum ada versi RPS. Klik tombol di bawah untuk membuat RPS baru.
+                                </p>
+                                <button
+                                    onClick={() => navigate(`${basePath}/rps/create?courseId=${courseId}`)}
+                                    className="btn btn-primary w-full shadow-md flex items-center justify-center gap-2"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Buat RPS Baru
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>

@@ -184,3 +184,39 @@ export const changePassword = async (req, res) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 };
+// Upload profile picture
+export const uploadProfilePicture = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const user = await User.findByPk(req.user.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Save file path to database (relative path)
+        // Note: We use forward slashes for URL compatibility
+        const profilePicturePath = req.file.path.replace(/\\/g, '/');
+
+        // Add slash at the beginning if not present so it works with the static mount
+        user.foto_profil = '/' + profilePicturePath;
+        await user.save();
+
+        res.json({
+            message: 'Profile picture updated successfully',
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                nama_lengkap: user.nama_lengkap,
+                foto_profil: user.foto_profil
+            }
+        });
+    } catch (error) {
+        console.error('Upload profile picture error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};

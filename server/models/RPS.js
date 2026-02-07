@@ -90,19 +90,67 @@ const RPS = sequelize.define('RPS', {
         allowNull: true,
         comment: 'Pustaka/bibliografi'
     },
+    pustaka_utama: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    pustaka_pendukung: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    media_software: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    media_hardware: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    dosen_pengampu_list: {
+        type: DataTypes.JSON,
+        defaultValue: [],
+        comment: 'Array of lecturer names'
+    },
+    mk_syarat: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    ambang_batas_mhs: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    ambang_batas_mk: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    cpl_ids: {
+        type: DataTypes.JSON,
+        defaultValue: [],
+        comment: 'Selected CPL IDs'
+    },
+    cpmk_ids: {
+        type: DataTypes.JSON,
+        defaultValue: [],
+        comment: 'Selected CPMK IDs'
+    },
     sub_cpmk_list: {
         type: DataTypes.JSON,
         defaultValue: [],
         comment: 'List of Sub-CPMKs: [{id, kode, deskripsi, cpmk_id}]'
     },
+    metode_penilaian: {
+        type: DataTypes.JSON,
+        defaultValue: [],
+        comment: 'List of assessment methods: [{type: "Rubrik", name: "...", scales: [...]}]'
+    },
     status: {
-        type: DataTypes.ENUM('draft', 'submitted', 'approved', 'revision', 'rejected'),
+        type: DataTypes.ENUM('draft', 'pending', 'submitted', 'approved', 'revision', 'rejected'),
         defaultValue: 'draft'
     },
-    catatan_kaprodi: {
+    catatan_approval: {
         type: DataTypes.TEXT,
         allowNull: true,
-        comment: 'Feedback from kaprodi'
+        comment: 'Feedback from approver (Kaprodi/Dekan)'
     },
     approved_by: {
         type: DataTypes.INTEGER,

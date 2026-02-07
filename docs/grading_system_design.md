@@ -389,7 +389,7 @@ GET  /api/grades/final/:mahasiswaId/:mataKuliahId
 ```
 ┌────────────────────────────────────────┐
 │ Mata Kuliah: Algoritma Pemrograman    │
-│ Dosen: Dr. Budi Santoso               │
+│ Dosen: Dr. Indra Surya Permana, MM., M.Kom. │
 │ Semester: Ganjil 2025/2026            │
 ├────────────────────────────────────────┤
 │ Assessment Breakdown:                  │

@@ -35,7 +35,12 @@ const CPL = sequelize.define('CPL', {
     kode_cpl: {
         type: DataTypes.STRING(20),
         allowNull: false,
-        unique: true
+        comment: 'Internal unique code with prefix, e.g., IF-CPL01'
+    },
+    kode_tampilan: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        comment: 'Display code for RPS, e.g., CPL01'
     },
     deskripsi: {
         type: DataTypes.TEXT,
@@ -65,9 +70,21 @@ const CPL = sequelize.define('CPL', {
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
+    indexes: [
+        {
+            unique: true,
+            fields: ['kode_cpl']
+        },
+        {
+            unique: true,
+            fields: ['kode_tampilan', 'prodi_id'],
+            name: 'unique_display_code_per_prodi'
+        }
+    ],
     validate: {
         hasOneOrganizationLevel() {
-            const levelCount = [this.institusi_id, this.fakultas_id, this.prodi_id].filter(id => id !== null).length;
+            const levels = [this.institusi_id, this.fakultas_id, this.prodi_id].filter(id => id != null);
+            const levelCount = levels.length;
             if (levelCount !== 1) {
                 throw new Error('CPL must belong to exactly one organizational level (institusi, fakultas, or prodi)');
             }

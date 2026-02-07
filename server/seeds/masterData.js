@@ -205,7 +205,7 @@ export const seedUsers = async (prodiId) => {
             email: 'kaprodi@mahardika.ac.id',
             password_hash: hashedPassword,
             role: 'kaprodi',
-            nama_lengkap: 'Dr. Budi Santoso, M.Kom',
+            nama_lengkap: 'Dr. Indra Surya Permana, MM., M.Kom.',
             prodi_id: prodiId,
             is_active: true
         },

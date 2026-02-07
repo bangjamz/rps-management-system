@@ -87,6 +87,12 @@ ProfilLulusan.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
 Prodi.hasMany(MataKuliah, { foreignKey: 'prodi_id', as: 'mata_kuliah' });
 MataKuliah.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
 
+Fakultas.hasMany(MataKuliah, { foreignKey: 'fakultas_id', as: 'mata_kuliah' });
+MataKuliah.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
+
+Institusi.hasMany(MataKuliah, { foreignKey: 'institusi_id', as: 'mata_kuliah' });
+MataKuliah.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
+
 Prodi.hasMany(Mahasiswa, { foreignKey: 'prodi_id', as: 'mahasiswa' });
 Mahasiswa.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
 
@@ -110,10 +116,30 @@ SubCPMK.belongsTo(CPMK, { foreignKey: 'cpmk_id', as: 'cpmk' });
 User.hasMany(CPMK, { foreignKey: 'created_by', as: 'created_cpmk' });
 CPMK.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
 
-
-// Prodi <-> Bahan Kajian
+// ========== CURRICULUM ORGANIZATIONAL ASSHOCIATIONS ==========
+// Bahan Kajian
+Institusi.hasMany(BahanKajian, { foreignKey: 'institusi_id', as: 'bahan_kajian' });
+BahanKajian.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
+Fakultas.hasMany(BahanKajian, { foreignKey: 'fakultas_id', as: 'bahan_kajian' });
+BahanKajian.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
 Prodi.hasMany(BahanKajian, { foreignKey: 'prodi_id', as: 'bahan_kajian' });
 BahanKajian.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+
+// CPMK
+Institusi.hasMany(CPMK, { foreignKey: 'institusi_id', as: 'cpmk' });
+CPMK.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
+Fakultas.hasMany(CPMK, { foreignKey: 'fakultas_id', as: 'cpmk' });
+CPMK.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
+Prodi.hasMany(CPMK, { foreignKey: 'prodi_id', as: 'cpmk' });
+CPMK.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+
+// Sub-CPMK
+Institusi.hasMany(SubCPMK, { foreignKey: 'institusi_id', as: 'sub_cpmk' });
+SubCPMK.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
+Fakultas.hasMany(SubCPMK, { foreignKey: 'fakultas_id', as: 'sub_cpmk' });
+SubCPMK.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
+Prodi.hasMany(SubCPMK, { foreignKey: 'prodi_id', as: 'sub_cpmk' });
+SubCPMK.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
 
 // Mata Kuliah <-> Bahan Kajian (many-to-many via junction table)
 MataKuliah.belongsToMany(BahanKajian, {

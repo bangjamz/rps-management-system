@@ -67,3 +67,23 @@ export const setActiveAcademicYear = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const getAllCourses = async (req, res) => {
+    try {
+        const { MataKuliah } = await import('../models/index.js');
+        // If user is Kaprodi, filter by prodi
+        const where = { is_active: true };
+        if (req.user.role === 'kaprodi') {
+            where.prodi_id = req.user.prodi_id;
+        }
+
+        const courses = await MataKuliah.findAll({
+            where,
+            order: [['kode_mk', 'ASC']],
+            attributes: ['id', 'kode_mk', 'nama_mk', 'sks', 'semester', 'prodi_id']
+        });
+        res.json(courses);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
