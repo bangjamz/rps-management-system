@@ -442,7 +442,8 @@ export const bulkUpsertPertemuan = async (req, res) => {
                 !String(id).startsWith('gen') &&
                 !String(id).includes('temp') &&
                 !String(id).includes('-') && // Catch-all for UUID-like temp IDs
-                !isNaN(parseInt(id))
+                !isNaN(parseInt(id)) &&
+                parseInt(id) < 2147483647 // Ensure it's within Int32 range
             );
 
         console.log('[DEBUG] Keeping IDs:', keepingIds);

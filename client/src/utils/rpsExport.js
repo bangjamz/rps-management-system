@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import axios from '../lib/axios';
 
 export const exportRPSToPDF = async (course, rpsData) => {
     try {
@@ -85,7 +86,10 @@ export const exportRPSToPDF = async (course, rpsData) => {
             if (globalSettings?.logo_path) {
                 const logoPath = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${globalSettings.logo_path}?t=${new Date().getTime()}`;
                 const logoImg = await loadImage(logoPath);
-                doc.addImage(logoImg, 'JPEG', margin, 10, 20, 20);
+                // Use PNG to support transparency, or leave it to Auto if possible
+                // jspdf supports 'PNG', 'JPEG', 'WEBP'
+                const format = globalSettings.logo_path.toLowerCase().endsWith('.png') ? 'PNG' : 'JPEG';
+                doc.addImage(logoImg, format, margin, 10, 20, 20);
             }
         } catch (error) {
             console.warn('Logo not loaded for PDF:', error);

@@ -436,7 +436,7 @@ export default function RPSEditorPage() {
         const utsWeek = Math.ceil(count / 2);
         const uasWeek = count;
         const newRows = Array.from({ length: count }, (_, i) => ({
-            id: Date.now() + i,
+            id: 'temp_' + Date.now() + i,
             minggu_ke: i + 1,
             cpmk_id: '',
             sub_cpmk_id: '',
@@ -733,7 +733,7 @@ export default function RPSEditorPage() {
                     contentRows.splice(existingRowIndex, 1); // Remove from pool
                 } else {
                     rowToUse = {
-                        id: Date.now() + Math.random(),
+                        id: 'temp_' + Date.now() + Math.random(),
                         indikator: '',
                         kriteria_penilaian: '',
                         teknik_penilaian: [],
@@ -856,7 +856,7 @@ export default function RPSEditorPage() {
         const newMinggu = maxWeek + 1;
 
         const newRows = [...rows, {
-            id: Date.now(),
+            id: 'temp_' + Date.now(),
             minggu_ke: newMinggu,
             cpmk_id: '',
             sub_cpmk_id: '',
@@ -2091,7 +2091,7 @@ export default function RPSEditorPage() {
                                                     <input
                                                         type="text"
                                                         value={row.minggu_ke}
-                                                        readOnly
+                                                        onChange={e => updateRow(index, 'minggu_ke', e.target.value)}
                                                         className="input input-sm input-bordered w-full text-center font-bold bg-white dark:bg-gray-800 dark:text-yellow-200 dark:border-yellow-700"
                                                     />
                                                 </div>
