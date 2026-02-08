@@ -421,12 +421,12 @@ export const updateRPS = async (req, res) => {
             return res.status(403).json({ message: 'You can only edit your own RPS' });
         }
 
-        // Only draft can be edited
+        // If RPS is not in draft, revert it to draft on edit (Editing an approved/submitted RPS makes it a draft again)
         if (rps.status !== 'draft') {
-            return res.status(400).json({
-                message: 'Only draft RPS can be edited',
-                currentStatus: rps.status
-            });
+            rps.status = 'draft';
+            rps.approved_by = null;
+            rps.approved_at = null;
+            // Optional: Add a log or history entry here if needed
         }
 
         // Update allowed fields

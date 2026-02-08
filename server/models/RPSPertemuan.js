@@ -54,9 +54,24 @@ const RPSPertemuan = sequelize.define('RPSPertemuan', {
         allowNull: true,
         comment: 'Link Zoom/GMeet if daring is selected'
     },
+    nama_lms: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Nama LMS (e.g. sibeda.mahardika.ac.id)'
+    },
+    link_meet_platform: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Platform: Google Meet, Zoom, or Manual'
+    },
     jenis_pertemuan: {
         type: DataTypes.ENUM('regular', 'uts', 'uas', 'praktikum', 'seminar'),
         defaultValue: 'regular'
+    },
+    kriteria_penilaian: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'Deskripsi kriteria penilaian'
     },
     penugasan: {
         type: DataTypes.TEXT,

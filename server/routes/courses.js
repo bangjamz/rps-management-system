@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { scopeData } from '../middleware/scopeFilter.js';
 import {
     getAllCourses,
     getCourseById,
@@ -12,6 +13,7 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(authenticate);
+router.use(scopeData);
 
 // Course routes
 router.get('/', getAllCourses);

@@ -32,6 +32,10 @@ export default function LoginPage() {
                 navigate('/kaprodi/dashboard');
             } else if (user.role === 'dosen') {
                 navigate('/dosen/dashboard');
+            } else if (user.role === 'superadmin' || user.role === 'admin') {
+                navigate('/super-admin');
+            } else if (user.role === 'mahasiswa') {
+                navigate('/mahasiswa/dashboard');
             } else {
                 navigate('/dashboard');
             }
@@ -43,7 +47,7 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-950 dark:via-slate-900 dark:to-gray-900 px-4 py-12 sm:py-0">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-primary-50 to-secondary-50 dark:from-gray-950 dark:via-primary-950/30 dark:to-gray-900 px-4 py-12 sm:py-0">
             <div className="w-full max-w-md">
                 {/* Logo & Title */}
                 <div className="text-center mb-10">
@@ -136,6 +140,15 @@ export default function LoginPage() {
                             </p>
                         </div>
                     </div>
+
+                    <div className="mt-6 text-center">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Belum punya akun?{' '}
+                            <a href="/register" className="text-primary-600 hover:text-primary-700 font-medium">
+                                Daftar Sekarang
+                            </a>
+                        </p>
+                    </div>
                 </div>
 
                 {/* Footer */}
@@ -145,7 +158,7 @@ export default function LoginPage() {
                 <div className="mt-8 flex justify-center">
                     <button
                         onClick={() => setShowHelp(true)}
-                        className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium flex items-center gap-2"
+                        className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium flex items-center gap-2 hover:underline transition-all"
                     >
                         <BookOpen className="w-4 h-4" />
                         Pusat Bantuan
@@ -154,6 +167,6 @@ export default function LoginPage() {
             </div>
 
             <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
-        </div>
+        </div >
     );
 }

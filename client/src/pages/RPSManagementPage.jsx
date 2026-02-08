@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, Search, Filter, Eye, CheckCircle, XCircle, Clock, FileCheck } from 'lucide-react';
 import axios from '../lib/axios';
+import toast from 'react-hot-toast';
 import useAuthStore from '../store/useAuthStore';
 import { exportRPSToPDF } from '../utils/rpsExport';
 
@@ -51,7 +52,7 @@ export default function RPSManagementPage() {
             await exportRPSToPDF(fullRps.mata_kuliah, fullRps);
         } catch (error) {
             console.error('Failed to export PDF:', error);
-            alert('Gagal export PDF');
+            toast.error('Gagal export PDF');
         }
     };
 
@@ -78,12 +79,13 @@ export default function RPSManagementPage() {
             const endpoint = `/rps/${selectedRPS.id}/${approvalAction}`;
             await axios.put(endpoint, { catatan_approval: catatan });
 
+            toast.success(`RPS berhasil di-${approvalAction}`);
             // Refresh list
             await fetchRPSList();
             handleCloseApprovalModal();
         } catch (error) {
             console.error(`Failed to ${approvalAction} RPS:`, error);
-            alert(error.response?.data?.message || `Failed to ${approvalAction} RPS`);
+            toast.error(error.response?.data?.message || `Gagal melakukan ${approvalAction} RPS`);
         } finally {
             setProcessing(false);
         }

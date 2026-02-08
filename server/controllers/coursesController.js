@@ -19,38 +19,31 @@ export const getAllCourses = async (req, res) => {
 
         let whereClause = {};
 
-        // 1. Role-based Base Access Control & Filtering
-        // 1. Role-based Base Access Control & Filtering
-        if (user.role === 'admin_institusi' || user.role === 'admin') {
-            // Admin sees all, can filter by anything
+        // 1. Role-based Scope (from middleware)
+        // Admin gets empty scope, so they see all by default but can filter below.
+        // Kaprodi/Dosen get specific scope (e.g. { prodi_id: 1 })
+        Object.assign(whereClause, req.dataScope);
+
+        // 2. Query Param Overrides (Admin only)
+        // If user is admin (empty scope), allow filtering by params
+        if (Object.keys(req.dataScope).length === 0) {
             if (fakultasId) whereClause.fakultas_id = fakultasId;
             if (prodiId) whereClause.prodi_id = prodiId;
+        }
 
-        } else if (user.role === 'dekan') {
-            const userFakultasId = user.fakultas_id;
-            if (prodiId) {
-                whereClause.prodi_id = prodiId;
-            } else {
-                // Dekan sees courses in their faculty (both faculty-level and prodi-level)
+        // 3. Dekan Special Case (Complex OR logic)
+        // Middleware sets { fakultas_id: X }. 
+        // We might want to expand this to "Courses in this Fakultas OR Courses in Prodis of this Fakultas"
+        // But for now, let's trust the middleware's simplistic scope or handle special cases if needed.
+        if (user.role === 'dekan') {
+            // If middleware set valid fakultas_id
+            if (req.dataScope.fakultas_id) {
+                delete whereClause.fakultas_id; // Remove simple equality check
                 whereClause[Op.or] = [
-                    { fakultas_id: userFakultasId },
-                    { '$prodi.fakultas_id$': userFakultasId }
+                    { fakultas_id: req.dataScope.fakultas_id },
+                    { '$prodi.fakultas_id$': req.dataScope.fakultas_id }
                 ];
             }
-
-        } else if (user.role === 'kaprodi') {
-            // Kaprodi strictly sees their prodi
-            whereClause.prodi_id = user.prodi_id;
-        } else {
-            // Dosen/Mahasiswa/Default
-            const userFakultasId = user.fakultas_id || user.prodi?.fakultas_id;
-            whereClause = {
-                [Op.or]: [
-                    { scope: 'institusi' },
-                    ...(userFakultasId ? [{ fakultas_id: userFakultasId }] : []),
-                    ...(user.prodi_id ? [{ prodi_id: user.prodi_id }] : [])
-                ]
-            };
         }
 
         // 2. Common Filter: Semester (ensure type safety)
@@ -102,7 +95,17 @@ export const getCourseById = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const course = await MataKuliah.findByPk(id);
+        const course = await MataKuliah.findByPk(id, {
+            include: [
+                {
+                    model: Prodi,
+                    as: 'prodi',
+                    include: [{ model: Fakultas, as: 'fakultas' }]
+                },
+                { model: Fakultas, as: 'fakultas' },
+                { model: Institusi, as: 'institusi' }
+            ]
+        });
 
         if (!course) {
             return res.status(404).json({ message: 'Course not found' });

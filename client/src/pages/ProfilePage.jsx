@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import useAuthStore from '../store/useAuthStore';
-import { User, Mail, Phone, Briefcase, MapPin, Hash, Award, Camera, Image as ImageIcon, Palette, Search, Upload, X, Check, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Briefcase, MapPin, Hash, Award, Camera, Image as ImageIcon, Palette, Search, Upload, X, Check, Loader2, Lock } from 'lucide-react';
 import { getTagColor } from '../utils/ui';
 import axios from '../lib/axios';
+import { toast } from 'react-hot-toast';
 
 // Expanded color/gradient options
 const SOLID_COLORS = [
@@ -44,8 +45,12 @@ const ProfilePage = () => {
     const [unsplashQuery, setUnsplashQuery] = useState('');
     const [unsplashResults, setUnsplashResults] = useState([]);
     const [searchingUnsplash, setSearchingUnsplash] = useState(false);
-    const [coverImage, setCoverImage] = useState(user?.cover_image || null);
-    const fileInputRef = useRef(null);
+    const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    const [changingPassword, setChangingPassword] = useState(false);
+
+    // Upload refs
+    const coverFileRef = useRef(null);
+    const avatarFileRef = useRef(null);
     const menuRef = useRef(null);
 
     // Close menu when clicking outside
@@ -61,18 +66,47 @@ const ProfilePage = () => {
 
     if (!user) return null;
 
-    const handleUpdateCover = async (coverValue) => {
+    // --- Cover Image Handlers ---
+
+    const handleUpdateCoverUrl = async (coverValue) => {
         try {
             setLoading(true);
-            setCoverImage(coverValue);
-
-            // Update via API
             await axios.put('/auth/profile', { cover_image: coverValue });
-            await checkAuth(); // Refresh user data
-
+            await checkAuth();
             setShowCoverMenu(false);
+            toast.success('Cover image updated');
         } catch (error) {
             console.error('Failed to update cover:', error);
+            toast.error('Failed to update cover');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCoverFileUpload = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('cover', file);
+
+        try {
+            setLoading(true);
+            await axios.post('/auth/cover-image', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            await checkAuth();
+            setShowCoverMenu(false);
+            toast.success('Cover image uploaded');
+        } catch (error) {
+            console.error('Failed to upload cover:', error);
+            const msg = error.response?.data?.message || 'Failed to upload cover';
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
@@ -83,8 +117,7 @@ const ProfilePage = () => {
 
         setSearchingUnsplash(true);
         try {
-            // Using Unsplash Source for simple random images by query
-            // In production, use Unsplash API with proper key
+            // Using Unsplash Source for simple random images by query (deprecated but using for demo) or placeholders
             const results = Array.from({ length: 6 }, (_, i) =>
                 `https://source.unsplash.com/1200x400/?${encodeURIComponent(unsplashQuery)}&sig=${Date.now() + i}`
             );
@@ -96,40 +129,81 @@ const ProfilePage = () => {
         }
     };
 
-    const handleFileUpload = (event) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        if (!file.type.startsWith('image/')) {
-            alert('Please select an image file');
-            return;
-        }
-
-        // Convert to base64 for preview and storage
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            handleUpdateCover(reader.result);
-        };
-        reader.readAsDataURL(file);
-    };
-
     const handleRemoveCover = async () => {
         try {
             setLoading(true);
-            setCoverImage(null);
             await axios.put('/auth/profile', { cover_image: null });
             await checkAuth();
             setShowCoverMenu(false);
         } catch (error) {
-            console.error('Failed to remove cover:', error);
+            toast.error('Failed to remove cover');
         } finally {
             setLoading(false);
         }
     };
 
+    // --- Avatar Handlers ---
+
+    const handleAvatarUpload = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        try {
+            setLoading(true);
+            await axios.post('/auth/profile-picture', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            await checkAuth();
+            toast.success('Avatar updated');
+        } catch (error) {
+            console.error('Failed to upload avatar:', error);
+            const msg = error.response?.data?.message || 'Failed to upload avatar';
+            toast.error(msg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // --- Password Handler ---
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            toast.error('Passwords do not match');
+            return;
+        }
+        if (passwordData.newPassword.length < 6) {
+            toast.error('Password must be at least 6 characters');
+            return;
+        }
+
+        setChangingPassword(true);
+        try {
+            await axios.post('/auth/change-password', {
+                currentPassword: passwordData.currentPassword,
+                newPassword: passwordData.newPassword
+            });
+            toast.success('Password changed successfully');
+            setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to change password');
+        } finally {
+            setChangingPassword(false);
+        }
+    };
+
+
     // Determine Cover Style
-    const currentCover = coverImage || user.cover_image;
-    const isImageUrl = currentCover && (currentCover.startsWith('http') || currentCover.startsWith('data:'));
+    const currentCover = user.cover_image;
+    const isImageUrl = currentCover && (currentCover.startsWith('http') || currentCover.startsWith('/') || currentCover.startsWith('data:'));
 
     const coverStyle = isImageUrl
         ? { backgroundImage: `url(${currentCover})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -140,7 +214,7 @@ const ProfilePage = () => {
         : (!currentCover ? GRADIENTS[0] : '');
 
     return (
-        <div className="p-6 max-w-4xl mx-auto mb-20">
+        <div className="p-6 max-w-4xl mx-auto mb-20 animate-fade-in">
             {/* Cover Area */}
             <div
                 className={`group relative h-48 w-full rounded-xl shadow-lg overflow-visible transition-all duration-300 ${coverClass}`}
@@ -149,10 +223,10 @@ const ProfilePage = () => {
                 onMouseLeave={() => setIsHoveringCover(false)}
             >
                 {/* Overlay for better text visibility on images */}
-                {isImageUrl && <div className="absolute inset-0 bg-black/10" />}
+                {isImageUrl && <div className="absolute inset-0 bg-black/10 rounded-xl" />}
 
                 {/* Change Cover Button */}
-                <div className={`absolute top-4 right-4 transition-opacity duration-200 ${isHoveringCover ? 'opacity-100' : 'opacity-0'}`}>
+                <div className={`absolute top-4 right-4 transition-opacity duration-200 ${isHoveringCover || showCoverMenu ? 'opacity-100' : 'opacity-0'}`}>
                     <div ref={menuRef} className="relative">
                         <button
                             onClick={() => setShowCoverMenu(!showCoverMenu)}
@@ -162,12 +236,12 @@ const ProfilePage = () => {
                         </button>
 
                         {showCoverMenu && (
-                            <div className="absolute top-12 right-0 bg-white dark:bg-gray-800 shadow-2xl rounded-xl p-4 w-80 z-50 border border-gray-200 dark:border-gray-700 animate-fade-in">
+                            <div className="absolute top-12 right-0 bg-white dark:bg-gray-800 shadow-2xl rounded-xl p-4 w-80 z-50 border border-gray-200 dark:border-gray-700 animate-slide-up-sm">
                                 {/* Tabs */}
                                 <div className="flex gap-1 mb-4 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
                                     <button
                                         onClick={() => setActiveTab('colors')}
-                                        className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all ${activeTab === 'colors'
+                                        className={`flex-1 py-1 px-3 text-xs font-medium rounded-md transition-all ${activeTab === 'colors'
                                             ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-900 dark:text-white'
                                             : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                             }`}
@@ -176,7 +250,7 @@ const ProfilePage = () => {
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('unsplash')}
-                                        className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all ${activeTab === 'unsplash'
+                                        className={`flex-1 py-1 px-3 text-xs font-medium rounded-md transition-all ${activeTab === 'unsplash'
                                             ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-900 dark:text-white'
                                             : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                             }`}
@@ -185,7 +259,7 @@ const ProfilePage = () => {
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('upload')}
-                                        className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-all ${activeTab === 'upload'
+                                        className={`flex-1 py-1 px-3 text-xs font-medium rounded-md transition-all ${activeTab === 'upload'
                                             ? 'bg-white dark:bg-gray-600 shadow-sm text-gray-900 dark:text-white'
                                             : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                             }`}
@@ -198,26 +272,26 @@ const ProfilePage = () => {
                                 {activeTab === 'colors' && (
                                     <div className="space-y-3">
                                         <div>
-                                            <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Warna Solid</h4>
+                                            <h4 className="text-[10px] font-semibold text-gray-400 mb-2 uppercase tracking-wider">Warna Solid</h4>
                                             <div className="grid grid-cols-10 gap-1.5">
                                                 {SOLID_COLORS.map((c, i) => (
                                                     <button
                                                         key={i}
                                                         className={`w-6 h-6 rounded-md ${c} border-2 border-transparent hover:border-gray-400 hover:scale-110 transition-transform`}
-                                                        onClick={() => handleUpdateCover(c)}
+                                                        onClick={() => handleUpdateCoverUrl(c)}
                                                         disabled={loading}
                                                     />
                                                 ))}
                                             </div>
                                         </div>
                                         <div>
-                                            <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Gradient</h4>
+                                            <h4 className="text-[10px] font-semibold text-gray-400 mb-2 uppercase tracking-wider">Gradient</h4>
                                             <div className="grid grid-cols-5 gap-2">
                                                 {GRADIENTS.map((c, i) => (
                                                     <button
                                                         key={i}
-                                                        className={`w-full h-8 rounded-lg ${c} border-2 border-transparent hover:border-gray-400 hover:scale-105 transition-transform`}
-                                                        onClick={() => handleUpdateCover(c)}
+                                                        className={`w-full h-8 rounded-md ${c} border-2 border-transparent hover:border-gray-400 hover:scale-105 transition-transform`}
+                                                        onClick={() => handleUpdateCoverUrl(c)}
                                                         disabled={loading}
                                                     />
                                                 ))}
@@ -247,22 +321,17 @@ const ProfilePage = () => {
                                             </button>
                                         </div>
 
-                                        <div>
-                                            <h4 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">
-                                                {unsplashResults.length > 0 ? 'Hasil Pencarian' : 'Pilihan Populer'}
-                                            </h4>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {(unsplashResults.length > 0 ? unsplashResults : UNSPLASH_PRESETS).map((url, i) => (
-                                                    <button
-                                                        key={i}
-                                                        onClick={() => handleUpdateCover(url)}
-                                                        className="aspect-video rounded-lg overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all hover:scale-105"
-                                                        disabled={loading}
-                                                    >
-                                                        <img src={url} alt="" className="w-full h-full object-cover" />
-                                                    </button>
-                                                ))}
-                                            </div>
+                                        <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                                            {(unsplashResults.length > 0 ? unsplashResults : UNSPLASH_PRESETS).map((url, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => handleUpdateCoverUrl(url)}
+                                                    className="aspect-video rounded-md overflow-hidden hover:ring-2 hover:ring-primary-500 transition-all hover:scale-105"
+                                                    disabled={loading}
+                                                >
+                                                    <img src={url} alt="" className="w-full h-full object-cover" />
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
@@ -271,7 +340,7 @@ const ProfilePage = () => {
                                 {activeTab === 'upload' && (
                                     <div className="space-y-3">
                                         <div
-                                            onClick={() => fileInputRef.current?.click()}
+                                            onClick={() => coverFileRef.current?.click()}
                                             className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
                                         >
                                             <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
@@ -279,55 +348,61 @@ const ProfilePage = () => {
                                             <p className="text-xs text-gray-400 mt-1">JPG, PNG, GIF (max 5MB)</p>
                                         </div>
                                         <input
-                                            ref={fileInputRef}
+                                            ref={coverFileRef}
                                             type="file"
                                             accept="image/*"
-                                            onChange={handleFileUpload}
+                                            onChange={handleCoverFileUpload}
                                             className="hidden"
                                         />
                                     </div>
                                 )}
 
                                 {/* Remove Cover Option */}
-                                {currentCover && (
-                                    <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3">
-                                        <button
-                                            onClick={handleRemoveCover}
-                                            className="btn btn-xs btn-ghost text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 w-full"
-                                            disabled={loading}
-                                        >
-                                            <X className="w-3 h-3 mr-1" /> Hapus Cover
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* Loading Indicator */}
-                                {loading && (
-                                    <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 rounded-xl flex items-center justify-center">
-                                        <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
-                                    </div>
-                                )}
+                                <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3">
+                                    <button
+                                        onClick={handleRemoveCover}
+                                        className="btn btn-xs btn-ghost text-red-500 w-full"
+                                        disabled={loading}
+                                    >
+                                        <X className="w-3 h-3 mr-1" /> Hapus Cover
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Profile Header Content - FIXED SPACING */}
+            {/* Profile Header Content */}
             <div className="px-8 max-w-4xl mx-auto">
                 <div className="relative flex flex-col md:flex-row items-start md:items-end -mt-16 pt-4 mb-8 gap-6">
                     {/* Avatar */}
                     <div className="relative group flex-shrink-0">
-                        <div className="w-32 h-32 rounded-full border-4 border-white dark:border-gray-900 bg-white dark:bg-gray-700 overflow-hidden shadow-lg flex items-center justify-center">
+                        <div className="w-32 h-32 rounded-full border-4 border-white dark:border-gray-900 bg-white dark:bg-gray-700 overflow-hidden shadow-lg flex items-center justify-center relative">
                             {user.foto_profil ? (
                                 <img src={user.foto_profil} alt={user.nama_lengkap} className="w-full h-full object-cover" />
                             ) : (
                                 <User className="w-16 h-16 text-gray-400" />
                             )}
+
+                            {/* Avatar Upload Overlay */}
+                            <div
+                                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-[2px]"
+                                onClick={() => avatarFileRef.current?.click()}
+                            >
+                                <Camera className="w-8 h-8 text-white" />
+                            </div>
+                            <input
+                                ref={avatarFileRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleAvatarUpload}
+                            />
                         </div>
                     </div>
 
-                    {/* Name & Role - INCREASED TOP SPACING */}
+                    {/* Name & Role */}
                     <div className="flex-1 pt-20 md:pt-0 md:pb-2">
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white leading-tight">{user.nama_lengkap}</h1>
                         <p className="text-lg text-gray-500 dark:text-gray-400 font-medium capitalize flex items-center gap-2 mt-1">
@@ -335,84 +410,117 @@ const ProfilePage = () => {
                             {user.is_active && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Active"></span>}
                         </p>
                     </div>
-
-                    {/* Action Buttons */}
-                    <div className="md:pb-2">
-                        {/* <button className="btn btn-outline btn-sm">Edit Profil</button> */}
-                    </div>
                 </div>
 
-                {/* Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-slide-up">
-                    {/* Column 1: Contact */}
-                    <div className="space-y-6">
-                        <div>
-                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-100 dark:border-gray-800 pb-2">Kontak</h3>
-                            <ul className="space-y-3">
-                                <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                    <Mail className="w-4 h-4 text-gray-400" />
-                                    <span className="truncate" title={user.email}>{user.email}</span>
-                                </li>
-                                <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                    <span className="w-4 flex justify-center text-gray-400 font-bold">@</span>
-                                    <span>{user.username}</span>
-                                </li>
-                                <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                    <Phone className="w-4 h-4 text-gray-400" />
-                                    <span>{user.telepon || '-'}</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+                {/* Main Grid: Details + Security */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                    {/* Column 2: Academic */}
-                    <div className="space-y-6">
-                        <div>
-                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-100 dark:border-gray-800 pb-2">Akademik</h3>
-                            <ul className="space-y-3">
-                                {user.nidn && (
-                                    <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                        <Hash className="w-4 h-4 text-gray-400" />
-                                        <div>
-                                            <span className="block text-xs text-gray-400">NIDN</span>
-                                            {user.nidn}
+                    {/* Left Column: Details (Span 2) */}
+                    <div className="lg:col-span-2 space-y-8">
+                        {/* Contact Info */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <Mail className="w-4 h-4 text-primary-500" /> Kontak
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Email</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">{user.email}</span>
+                                </div>
+                                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Username</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">@{user.username}</span>
+                                </div>
+                                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Telepon</span>
+                                    <span className="font-medium text-gray-900 dark:text-white">{user.telepon || '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Academic Info */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <Award className="w-4 h-4 text-primary-500" /> Akademik & Pekerjaan
+                            </h3>
+                            <div className="space-y-4">
+                                {(user.nidn || user.homebase) && (
+                                    <div className="flex gap-4">
+                                        {user.nidn && <span className="badge badge-outline">NIDN: {user.nidn}</span>}
+                                        {user.homebase && <span className="badge badge-primary badge-outline">{user.homebase}</span>}
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {user.jabatan && (
+                                        <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
+                                            <Briefcase className="w-4 h-4 text-gray-400" />
+                                            <span>{user.jabatan}</span>
                                         </div>
-                                    </li>
-                                )}
-                                {user.homebase && (
-                                    <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                        <MapPin className="w-4 h-4 text-gray-400" />
-                                        <span className={`${getTagColor('prodi')} px-2 py-0.5 rounded text-[10px] font-bold uppercase border`}>
-                                            {user.homebase}
-                                        </span>
-                                    </li>
-                                )}
-                            </ul>
+                                    )}
+                                    {user.status_kepegawaian && (
+                                        <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
+                                            <Award className="w-4 h-4 text-gray-400" />
+                                            <span className={`${getTagColor(user.status_kepegawaian)} px-2 py-0.5 rounded text-xs font-semibold`}>
+                                                {user.status_kepegawaian}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Column 3: Employment */}
-                    <div className="space-y-6">
-                        <div>
-                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-100 dark:border-gray-800 pb-2">Kepegawaian</h3>
-                            <ul className="space-y-3">
-                                {user.jabatan && (
-                                    <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                        <Award className="w-4 h-4 text-gray-400" />
-                                        <span>{user.jabatan}</span>
-                                    </li>
-                                )}
-                                {user.status_kepegawaian && (
-                                    <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                        <Briefcase className="w-4 h-4 text-gray-400" />
-                                        <span className={`${getTagColor(user.status_kepegawaian)} px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider`}>
-                                            {user.status_kepegawaian}
-                                        </span>
-                                    </li>
-                                )}
-                            </ul>
+                    {/* Right Column: Security (Span 1) */}
+                    <div className="lg:col-span-1">
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 sticky top-24">
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-2">
+                                <Lock className="w-4 h-4 text-primary-500" /> Keamanan
+                            </h3>
+
+                            <form onSubmit={handleChangePassword} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Password Saat Ini</label>
+                                    <input
+                                        type="password"
+                                        className="input input-sm w-full"
+                                        value={passwordData.currentPassword}
+                                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Password Baru</label>
+                                    <input
+                                        type="password"
+                                        className="input input-sm w-full"
+                                        value={passwordData.newPassword}
+                                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                        required
+                                        minLength={6}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Konfirmasi Password</label>
+                                    <input
+                                        type="password"
+                                        className="input input-sm w-full"
+                                        value={passwordData.confirmPassword}
+                                        onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                        required
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary btn-sm w-full mt-2"
+                                    disabled={changingPassword}
+                                >
+                                    {changingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ganti Password'}
+                                </button>
+                            </form>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>

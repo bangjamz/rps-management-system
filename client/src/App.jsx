@@ -1,18 +1,23 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute, { PublicRoute } from './components/ProtectedRoute';
+import { Toaster } from 'react-hot-toast';
 import DashboardLayout from './components/DashboardLayout';
 import LoginPage from './pages/LoginPage';
+import RegistrationPage from './pages/RegistrationPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import KaprodiDashboard from './pages/KaprodiDashboard';
 import DosenDashboard from './pages/DosenDashboard';
 import MahasiswaDashboard from './pages/MahasiswaDashboard';
 import SettingsPage from './pages/SettingsPage';
 import ProfilePage from './pages/ProfilePage';
+import ProfileSetupPage from './pages/ProfileSetupPage';
 import CurriculumPage from './pages/CurriculumPage';
 import CoursesPage from './pages/CoursesPage';
 import RPSViewPage from './pages/RPSViewPage';
 import RPSVersionsPage from './pages/RPSVersionsPage';
 import LecturerAssignmentPage from './pages/LecturerAssignmentPage';
 import RPSManagementPage from './pages/RPSManagementPage';
+import UserManagementPage from './pages/UserManagementPage';
 import DosenCoursesPage from './pages/DosenCoursesPage';
 import AssessmentSetupPage from './pages/AssessmentSetupPage';
 import GradeInputPage from './pages/GradeInputPage';
@@ -22,11 +27,54 @@ import RPSEditorPage from './pages/RPSEditorPage';
 import AnalyticsDashboardPage from './pages/AnalyticsDashboardPage';
 import CPLAnalyticsPage from './pages/CPLAnalyticsPage';
 import DataDosenPage from './pages/DataDosenPage';
+import KaprodiMKAktifPage from './pages/KaprodiMKAktifPage'; // Add this line
+import SuperAdminDashboard from './pages/SuperAdminDashboard'; // Add this line
+import GlobalSettingsPage from './pages/GlobalSettingsPage'; // Add this line
+import UserRolesPage from './pages/UserRolesPage';
+import OrganizationManagementPage from './pages/OrganizationManagementPage';
+import AcademicSettingsPage from './pages/AcademicSettingsPage';
 import { ROLES } from './utils/permissions';
+import useAuthStore from './store/useAuthStore';
+
+// Role-based dashboard router
+const Dashboard = () => {
+    const { user } = useAuthStore();
+
+    if (!user) return <Navigate to="/login" replace />;
+
+    switch (user.role) {
+        case ROLES.KAPRODI:
+            return <Navigate to="/kaprodi/dashboard" replace />;
+        case ROLES.DOSEN:
+            return <Navigate to="/dosen/dashboard" replace />;
+        case ROLES.MAHASISWA:
+            return <Navigate to="/mahasiswa/dashboard" replace />;
+        case 'superadmin':
+        case 'admin':
+            return <Navigate to="/super-admin" replace />;
+        default:
+            return (
+                <div className="p-8 text-center">
+                    <h1 className="text-2xl font-bold">Role not recognized</h1>
+                    <p className="text-gray-500">Contact admin to assign a role to your account.</p>
+                </div>
+            );
+    }
+};
+
+import { useEffect } from 'react';
+import useGlobalStore from './store/useGlobalStore';
 
 function App() {
+    const { fetchSettings } = useGlobalStore();
+
+    useEffect(() => {
+        fetchSettings();
+    }, [fetchSettings]);
+
     return (
         <BrowserRouter>
+            <Toaster position="top-right" />
             <Routes>
                 {/* Public Routes */}
                 <Route
@@ -34,6 +82,22 @@ function App() {
                     element={
                         <PublicRoute>
                             <LoginPage />
+                        </PublicRoute>
+                    }
+                />
+                <Route
+                    path="/register"
+                    element={
+                        <PublicRoute>
+                            <RegistrationPage />
+                        </PublicRoute>
+                    }
+                />
+                <Route
+                    path="/verify-email"
+                    element={
+                        <PublicRoute>
+                            <VerifyEmailPage />
                         </PublicRoute>
                     }
                 />
@@ -49,6 +113,7 @@ function App() {
                                     <Route path="curriculum" element={<CurriculumPage />} />
                                     <Route path="courses" element={<CoursesPage />} />
                                     <Route path="lecturer-assignments" element={<LecturerAssignmentPage />} />
+                                    <Route path="mk-aktif" element={<KaprodiMKAktifPage />} />
                                     <Route path="courses/:courseId/enrollment" element={<EnrollmentManagementPage />} />
                                     <Route path="rps/:courseId" element={<RPSVersionsPage />} />
                                     <Route path="rps/view/:rpsId" element={<RPSViewPage />} />
@@ -115,6 +180,15 @@ function App() {
                     }
                 />
 
+                <Route
+                    path="/profile-setup"
+                    element={
+                        <ProtectedRoute>
+                            <ProfileSetupPage />
+                        </ProtectedRoute>
+                    }
+                />
+
                 {/* Settings Route (accessible by all authenticated users) */}
                 <Route
                     path="/settings"
@@ -143,9 +217,30 @@ function App() {
                     }
                 />
 
+                {/* Super Admin Routes */}
+                <Route path="/super-admin" element={<ProtectedRoute allowedRoles={['superadmin', 'admin']}><SuperAdminDashboard /></ProtectedRoute>}>
+                    <Route index element={<div className="p-8 text-center text-gray-500">Welcome to Super Admin Dashboard. Select an option from the menu.</div>} />
+                    <Route path="settings" element={<GlobalSettingsPage />} />
+                    <Route path="users" element={<UserManagementPage />} />
+                    <Route path="approvals" element={<UserManagementPage />} />
+                    <Route path="roles" element={<UserRolesPage />} />
+                    <Route path="organization" element={<OrganizationManagementPage />} />
+                    <Route path="academic" element={<AcademicSettingsPage />} />
+                </Route>
+
                 {/* Default Redirect */}
-                <Route path="/" element={<Navigate to="/login" replace />} />
-                <Route path="*" element={<Navigate to="/login" replace />} />
+
+                <Route
+                    path="/dashboard"
+                    element={
+                        <ProtectedRoute>
+                            <Dashboard />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
         </BrowserRouter>
     );

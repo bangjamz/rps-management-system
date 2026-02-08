@@ -1,5 +1,6 @@
 // Import all models
 import User from './User.js';
+import UserProfile from './UserProfile.js';
 import Institusi from './Institusi.js';
 import Fakultas from './Fakultas.js';
 import Prodi from './Prodi.js';
@@ -28,6 +29,8 @@ import Attendance from './Attendance.js';
 import Enrollment from './Enrollment.js';
 import Notification from './Notification.js';
 import AcademicYear from './AcademicYear.js';
+import CustomAdminRole from './CustomAdminRole.js';
+import MKAktif from './MKAktif.js';
 
 // Define associations
 
@@ -303,10 +306,33 @@ NilaiMahasiswa.belongsTo(SubCPMK, { foreignKey: 'sub_cpmk_id', as: 'sub_cpmk' })
 User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications' });
 Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
+// User -> UserProfile
+User.hasOne(UserProfile, { foreignKey: 'user_id', as: 'profile' });
+UserProfile.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// User -> CustomAdminRole (created_by)
+User.hasMany(CustomAdminRole, { foreignKey: 'created_by', as: 'created_roles' });
+CustomAdminRole.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
+// ========== MK AKTIF (Course Distribution) ==========
+MKAktif.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mata_kuliah' });
+MataKuliah.hasMany(MKAktif, { foreignKey: 'mata_kuliah_id', as: 'mk_aktif' });
+
+MKAktif.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Prodi.hasMany(MKAktif, { foreignKey: 'prodi_id', as: 'mk_aktif' });
+
+MKAktif.belongsTo(AcademicYear, { foreignKey: 'tahun_akademik_id', as: 'tahun_akademik' });
+AcademicYear.hasMany(MKAktif, { foreignKey: 'tahun_akademik_id', as: 'mk_aktif' });
+
+MKAktif.belongsTo(User, { foreignKey: 'dosen_pengampu_id', as: 'dosen_pengampu' });
+User.hasMany(MKAktif, { foreignKey: 'dosen_pengampu_id', as: 'mk_diampu' });
+
 // Export all models
 export {
     User,
+    UserProfile, // Add this
     Institusi,
+    // ...
     Fakultas,
     Prodi,
     ProfilLulusan,
@@ -333,5 +359,7 @@ export {
     Attendance,
     Enrollment,
     Notification,
-    AcademicYear
+    AcademicYear,
+    CustomAdminRole,
+    MKAktif
 };

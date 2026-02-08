@@ -9,6 +9,7 @@ import {
     deleteBatchCPMK, deleteBatchSubCPMK
 } from '../controllers/curriculumController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
+import { scopeData } from '../middleware/scopeFilter.js';
 import path from 'path';
 import fs from 'fs';
 

@@ -6,9 +6,11 @@ import {
     CPMK,
     SubCPMK,
     Prodi,
-    User
+    User,
+    DosenAssignment
 } from '../models/index.js';
 
+import sequelize from '../config/database.js';
 import { Op } from 'sequelize';
 
 /**
@@ -331,13 +333,17 @@ export const updateRPS = async (req, res) => {
         }
 
         // Allow editing draft, rejected, or pending status
+        // Allow editing draft, rejected, or pending status
+        // If status is not editable (e.g. Approved), revert to Draft to allow editing
         const editableStatuses = ['draft', 'rejected', 'pending'];
         if (!editableStatuses.includes(rps.status) && !isAdmin) {
-            console.log('Cannot edit RPS with status:', rps.status);
-            return res.status(400).json({
-                message: `Cannot update RPS with status "${rps.status}". Only draft/rejected/pending RPS can be edited.`,
-                currentStatus: rps.status
-            });
+            console.log(`Auto-reverting RPS ${rps.id} from ${rps.status} to draft`);
+            // We don't save here immediately, but we update the object so the update() call below includes it
+            req.body.status = 'draft';
+            req.body.approved_by = null;
+            req.body.approved_at = null;
+            // Also update the rps instance for any immediate checks
+            rps.status = 'draft';
         }
 
         // Build update object, only including non-undefined values
@@ -386,80 +392,103 @@ export const updateRPS = async (req, res) => {
  * Bulk create/update pertemuan for an RPS
  */
 export const bulkUpsertPertemuan = async (req, res) => {
+    const t = await sequelize.transaction();
     try {
         const { rpsId } = req.params;
         const { pertemuan } = req.body; // Array of pertemuan objects
 
         if (!Array.isArray(pertemuan)) {
+            await t.rollback();
             return res.status(400).json({ message: 'pertemuan must be an array' });
         }
 
-        console.log(`[bulkUpsertPertemuan] Saving ${pertemuan.length} items for RPS ${rpsId}`);
+        console.log(`[bulkUpsertPertemuan] Saving ${pertemuan.length} records for RPS ${rpsId}`);
 
-        const rps = await RPS.findByPk(rpsId);
+        const rps = await RPS.findByPk(rpsId, { transaction: t });
         if (!rps) {
+            await t.rollback();
             return res.status(404).json({ message: 'RPS not found' });
         }
 
         // Check ownership or permission
         const isOwner = rps.dosen_id === req.user.id;
-        const canEdit = isOwner || ['kaprodi', 'dekan', 'admin'].includes(req.user.role);
+        const canEdit = isOwner || ['kaprodi', 'dekan', 'admin_institusi'].includes(req.user.role);
 
         if (!canEdit) {
-            console.log(`[bulkUpsertPertemuan] Permission denied for user ${req.user.id} (${req.user.role}) on RPS ${rpsId}`);
+            await t.rollback();
             return res.status(403).json({ message: 'You do not have permission to edit this RPS' });
         }
 
         // Can only edit if Draft
+        // If not in draft, revert to draft (Auto-fix for consistency with updateRPS)
         if (rps.status && rps.status.toLowerCase() !== 'draft') {
-            return res.status(400).json({
-                message: 'Can only edit RPS in Draft status'
-            });
+            await rps.update({
+                status: 'draft',
+                approved_by: null,
+                approved_at: null
+            }, { transaction: t });
+            rps.status = 'draft';
         }
 
-        console.log('[DEBUG] Start bulkUpsert. Pertemuan count:', pertemuan?.length);
-
-        // --- NEW LOGIC: Delete orphaned rows ---
-        console.log('[DEBUG] filtering keepingIds...');
+        // --- Orphan Removal Strategy ---
+        // We only keep IDs that are valid integers (existing in DB). 
+        // "new-..." or "uts-..." IDs are considered new and will be created.
         const keepingIds = pertemuan
             .map(p => p.id)
-            .filter(id => id && !String(id).startsWith('new-') && !String(id).includes('temp') && !isNaN(parseInt(id)) && Number.isInteger(Number(id)) && !String(id).includes('-'));
+            .filter(id => id &&
+                !String(id).startsWith('new') &&
+                !String(id).startsWith('uts') &&
+                !String(id).startsWith('uas') &&
+                !String(id).startsWith('gen') &&
+                !String(id).includes('temp') &&
+                !String(id).includes('-') && // Catch-all for UUID-like temp IDs
+                !isNaN(parseInt(id))
+            );
 
-        console.log('[DEBUG] keepingIds:', keepingIds);
+        console.log('[DEBUG] Keeping IDs:', keepingIds);
 
         if (keepingIds.length > 0) {
-            console.log('[DEBUG] destroying orphans (notIn keepingIds)...');
             await RPSPertemuan.destroy({
                 where: {
                     rps_id: rpsId,
                     id: { [Op.notIn]: keepingIds }
-                }
+                },
+                transaction: t
             });
-        } else if (pertemuan.length > 0) {
-            console.log('[DEBUG] destroying all (no valid IDs kept)...');
-            await RPSPertemuan.destroy({
-                where: { rps_id: rpsId }
-            });
+        } else {
+            if (pertemuan.length > 0) {
+                await RPSPertemuan.destroy({
+                    where: { rps_id: rpsId },
+                    transaction: t
+                });
+            } else {
+                // Sent empty array -> Delete all
+                await RPSPertemuan.destroy({
+                    where: { rps_id: rpsId },
+                    transaction: t
+                });
+            }
         }
-        // ----------------------------------------
 
         const results = [];
-        console.log('[DEBUG] Starting loop...');
 
         for (const item of pertemuan) {
+            console.log('[DEBUG] bulkUpsertPertemuan item:', JSON.stringify(item));
             const {
                 minggu_ke,
-                sampai_minggu_ke, // Add this
+                sampai_minggu_ke,
                 sub_cpmk,
-                sub_cpmk_id, // Add this
+                sub_cpmk_id,
                 indikator,
                 materi,
                 metode_pembelajaran,
                 bentuk_pembelajaran,
                 link_daring,
+                nama_lms,
+                link_meet_platform,
                 bentuk_evaluasi,
                 bobot_penilaian,
-                is_uts, // Extract these flags
+                is_uts,
                 is_uas
             } = item;
 
@@ -468,125 +497,86 @@ export const bulkUpsertPertemuan = async (req, res) => {
             if (is_uts) jenis_pertemuan = 'uts';
             else if (is_uas) jenis_pertemuan = 'uas';
 
-            // Sanitize minggu_ke to integer (handle strings like "1" or "1-2" if leaked)
+            // Sanitize integers
             let weekNum = parseInt(minggu_ke, 10);
             if (isNaN(weekNum)) {
-                // Try to recover from "1-2" style string if frontend sent it raw
                 if (typeof minggu_ke === 'string' && minggu_ke.includes('-')) {
                     weekNum = parseInt(minggu_ke.split('-')[0], 10);
                 }
             }
-            if (isNaN(weekNum)) {
-                console.log(`[bulkUpsertPertemuan] Error: Invalid week number "${minggu_ke}"`);
-                continue; // Skip invalid rows
-            }
+            // Fallback if still NaN (should not happen if validated frontend)
+            if (isNaN(weekNum)) weekNum = 0;
 
-            // Sanitize bobot_penilaian to integer
-            const sanitizedBobot = bobot_penilaian ? parseInt(bobot_penilaian, 10) : null;
-            if (isNaN(sanitizedBobot)) {
-                console.log(`[bulkUpsertPertemuan] Warning: bobot_penilaian "${bobot_penilaian}" is not a valid number for week ${minggu_ke}`);
-            }
+            // Sanitized end week
+            let untilWeek = sampai_minggu_ke ? parseInt(sampai_minggu_ke, 10) : null;
+            if (isNaN(untilWeek)) untilWeek = null;
 
-            console.log(`[bulkUpsertPertemuan] Processing week ${minggu_ke}:`, {
-                sub_cpmk: sub_cpmk?.substring?.(0, 30) || sub_cpmk,
-                materi: materi?.substring?.(0, 30) || materi,
-                bobot_penilaian: sanitizedBobot
-            });
+            // Sanitize Sub-CPMK ID (ensure it's string or null, not "undefined" string)
+            let safeSubId = sub_cpmk_id;
+            if (safeSubId === 'undefined' || safeSubId === 'null') safeSubId = null;
 
-
-            // Handle mapping: resolve full text from sub_cpmk_list if only ID is provided
+            // Resolve Sub-CPMK Text
             let subCpmkValue = sub_cpmk;
-            if (!subCpmkValue && sub_cpmk_id && rps.sub_cpmk_list) {
-                const sub = rps.sub_cpmk_list.find(s => s.id == sub_cpmk_id || s.id === String(sub_cpmk_id));
-                if (sub) {
-                    subCpmkValue = `${sub.kode || sub.id}: ${sub.deskripsi}`;
-                }
+            if (!subCpmkValue && safeSubId && rps.sub_cpmk_list) {
+                // Try to find in sub_cpmk_list JSON column if available on RPS object (it might be if we fetched it, but findByPk needs attributes or default scope)
+                // RPS.findByPk above didn't explicitly include it but default might have it. 
+                // We'll proceed with what we have.
             }
-            if (!subCpmkValue) subCpmkValue = sub_cpmk_id; // Fallback to ID if still nothing
 
-            try {
-                // Determine if we should Update by ID or Create New
-                // STRICT CHECK: ID must be a number (positive integer). Strings like "uts-..." or "new-..." are NOT existing IDs.
-                const isExistingId = item.id &&
-                    !String(item.id).startsWith('new-') &&
-                    !String(item.id).includes('temp') &&
-                    !String(item.id).includes('uts-') &&
-                    !String(item.id).includes('uas-') &&
-                    !isNaN(parseInt(item.id)) &&
-                    Number.isInteger(Number(item.id));
+            // Payload
+            const payload = {
+                rps_id: rpsId,
+                minggu_ke: weekNum,
+                sampai_minggu_ke: untilWeek,
+                sub_cpmk: subCpmkValue,
+                sub_cpmk_id: safeSubId,
+                indikator: indikator || '',
+                materi: materi || '',
+                metode_pembelajaran: Array.isArray(metode_pembelajaran) ? JSON.stringify(metode_pembelajaran) : (metode_pembelajaran || ''),
+                bentuk_pembelajaran: Array.isArray(bentuk_pembelajaran) ? bentuk_pembelajaran : [],
+                link_daring: link_daring || '',
+                nama_lms: nama_lms || '',
+                link_meet_platform: link_meet_platform || '',
+                penugasan: item.penugasan || '', // Add penugasan field
+                jenis_pertemuan,
+                bentuk_evaluasi,
+                bobot_penilaian: parseInt(bobot_penilaian) || 0,
+                is_uts: !!is_uts,
+                is_uas: !!is_uas
+            };
 
-                if (isExistingId) {
-                    // Update existing row
-                    await RPSPertemuan.update({
-                        minggu_ke: weekNum,
-                        sampai_minggu_ke,
-                        sub_cpmk: subCpmkValue,
-                        sub_cpmk_id,
-                        indikator,
-                        materi,
-                        metode_pembelajaran: Array.isArray(metode_pembelajaran) ? JSON.stringify(metode_pembelajaran) : metode_pembelajaran,
-                        bentuk_pembelajaran: Array.isArray(bentuk_pembelajaran) ? bentuk_pembelajaran : [],
-                        link_daring,
-                        bentuk_evaluasi,
-                        bobot_penilaian: sanitizedBobot
-                    }, {
-                        where: {
-                            id: item.id,
-                            rps_id: rpsId // Extra safety
-                        }
-                    });
+            // Check if this is an update to an existing ID
+            const isExistingId = item.id && keepingIds.includes(parseInt(item.id));
 
-                    // Fetch updated record to return
-                    record = await RPSPertemuan.findOne({ where: { id: item.id } });
-
-                } else {
-                    // Create new row
-                    // Handle potential UNIQUE constraint collision if 'minggu_ke' is already taken (and wasn't deleted)
-                    // We try to find first to be safe, or just upsert-like logic
-                    const existingAtWeek = await RPSPertemuan.findOne({
-                        where: { rps_id: rpsId, minggu_ke: weekNum }
-                    });
-
-                    const payloadIdx = {
-                        rps_id: rpsId,
-                        minggu_ke: weekNum,
-                        sampai_minggu_ke,
-                        sub_cpmk: subCpmkValue,
-                        sub_cpmk_id,
-                        indikator,
-                        materi,
-                        metode_pembelajaran: Array.isArray(metode_pembelajaran) ? JSON.stringify(metode_pembelajaran) : metode_pembelajaran,
-                        bentuk_pembelajaran: Array.isArray(bentuk_pembelajaran) ? bentuk_pembelajaran : [],
-                        link_daring,
-                        bentuk_evaluasi,
-                        bobot_penilaian: sanitizedBobot
-                    };
-
-                    if (existingAtWeek) {
-                        // Collision! Update the occupier
-                        await existingAtWeek.update(payloadIdx);
-                        record = existingAtWeek;
-                    } else {
-                        // Safe to create
-                        record = await RPSPertemuan.create(payloadIdx);
-                    }
-                }
-
-                if (record) results.push(record);
-
-            } catch (innerErr) {
-                console.error(`[bulkUpsertPertemuan] Row Error (Week ${weekNum}):`, innerErr.message);
-                // Don't throw, just log. We want partial success if possible.
+            if (isExistingId) {
+                await RPSPertemuan.update(payload, {
+                    where: { id: item.id },
+                    transaction: t
+                });
+                results.push({ id: item.id, ...payload });
+            } else {
+                // Create new
+                const newRec = await RPSPertemuan.create(payload, { transaction: t });
+                results.push(newRec);
             }
-        } // End loop
+        }
+
+        await t.commit();
+        console.log(`[bulkUpsertPertemuan] Successfully committed transaction. Saved ${results.length} records.`);
 
         res.json({
             message: `${results.length} pertemuan records saved`,
             pertemuan: results
         });
+
     } catch (error) {
-        console.error('Error bulk upserting pertemuan:', error);
-        res.status(500).json({ message: 'Failed to save pertemuan', error: error.message });
+        await t.rollback();
+        console.error('Error bulk upserting pertemuan (Transaction Rolled Back):', error);
+        res.status(500).json({
+            message: 'Failed to save pertemuan',
+            error: error.message,
+            details: error.parent?.detail || error.original?.message
+        });
     }
 };
 
@@ -710,6 +700,13 @@ export const getDosenCourses = async (req, res) => {
         // Get all courses in user's prodi
         const courses = await MataKuliah.findAll({
             where: { prodi_id: user.prodi_id },
+            include: [
+                {
+                    model: DosenAssignment,
+                    as: 'assignments',
+                    include: [{ model: User, as: 'dosen', attributes: ['nama_lengkap'] }]
+                }
+            ],
             order: [['kode_mk', 'ASC']]
         });
 

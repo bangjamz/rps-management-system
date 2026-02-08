@@ -1,23 +1,45 @@
 import express from 'express';
-import { login, getProfile, updateProfile, changePassword } from '../controllers/authController.js';
-import { authenticate } from '../middleware/auth.js';
+import {
+    login,
+    register,
+    verifyEmail,
+    getProfile,
+    updateProfile,
+    changePassword,
+    uploadProfilePicture,
+    uploadCoverImage
+} from '../controllers/authController.js';
+import {
+    impersonateUser,
+    endImpersonation,
+    switchRole
+} from '../controllers/impersonationController.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const router = express.Router();
 
 // Public routes
 router.post('/login', login);
+router.post('/register', register);
+router.get('/verify-email', verifyEmail);
 
 // Protected routes
 router.get('/profile', authenticate, getProfile);
 router.put('/profile', authenticate, updateProfile);
 router.post('/change-password', authenticate, changePassword);
 
-// Profile Picture Upload
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+// Role Switching (for users with multiple roles)
+router.post('/switch-role', authenticate, switchRole);
 
-// Ensure uploads directory exists
+// Impersonation (Super Admin only)
+// IMPORTANT: Static routes must come before parameterized routes
+router.post('/impersonate/end', authenticate, endImpersonation);
+router.post('/impersonate/:userId', authenticate, authorize(['superadmin']), impersonateUser);
+
+// Profile Picture Upload
 const uploadDir = 'uploads/profiles';
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -35,7 +57,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: (req, file, cb) => {
         const filetypes = /jpeg|jpg|png|gif|webp/;
         const mimetype = filetypes.test(file.mimetype);
@@ -48,7 +70,8 @@ const upload = multer({
     }
 });
 
-import { uploadProfilePicture } from '../controllers/authController.js';
 router.post('/profile-picture', authenticate, upload.single('photo'), uploadProfilePicture);
+router.post('/cover-image', authenticate, upload.single('cover'), uploadCoverImage);
 
 export default router;
+

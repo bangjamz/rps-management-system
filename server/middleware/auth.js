@@ -1,8 +1,10 @@
 import { verifyToken } from '../utils/jwt.js';
-import { User, Institusi, Fakultas, Prodi, Dosen } from '../models/index.js';
+import { User, Institusi, Fakultas, Prodi, Dosen, UserProfile } from '../models/index.js';
 
 // ========== PERMISSION CONSTANTS ==========
 export const ROLES = {
+    SUPERADMIN: 'superadmin',
+    ADMIN: 'admin',
     ADMIN_INSTITUSI: 'admin_institusi',
     DEKAN: 'dekan',
     KAPRODI: 'kaprodi',
@@ -38,7 +40,8 @@ export const authenticate = async (req, res, next) => {
                 { model: Institusi, as: 'institusi', attributes: ['id', 'nama'] },
                 { model: Fakultas, as: 'fakultas', attributes: ['id', 'kode', 'nama'] },
                 { model: Prodi, as: 'prodi', attributes: ['id', 'kode', 'nama', 'jenjang', 'fakultas_id'] },
-                { model: Dosen, as: 'dosen', attributes: ['id', 'nama_lengkap', 'nidn', 'prodi_id'] }
+                { model: Dosen, as: 'dosen', attributes: ['id', 'nama_lengkap', 'nidn', 'prodi_id'] },
+                { model: UserProfile, as: 'profile' }
             ]
         });
 
@@ -119,8 +122,8 @@ export const checkOrganizationAccess = (level, idParam = 'id') => {
 async function userHasAccessToResource(user, level, resourceId) {
     const role = user.role;
 
-    // Admin institusi has access to everything
-    if (role === ROLES.ADMIN_INSTITUSI) {
+    // Superadmin and Admin have access to everything
+    if (role === ROLES.SUPERADMIN || role === ROLES.ADMIN || role === ROLES.ADMIN_INSTITUSI) {
         return true;
     }
 

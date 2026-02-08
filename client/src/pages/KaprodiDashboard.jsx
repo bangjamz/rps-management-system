@@ -59,20 +59,20 @@ export default function KaprodiDashboard() {
             </div>
 
             {/* Main Hero Card: RPS Progress */}
-            <div className="bg-gradient-to-br from-indigo-600 to-blue-700 dark:from-indigo-900 dark:to-blue-950 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden ring-1 ring-white/10 dark:ring-white/5">
+            <div className="bg-gradient-to-br from-primary-600 to-primary-800 dark:from-primary-900 dark:to-primary-950 rounded-2xl p-8 text-white shadow-xl relative overflow-hidden ring-1 ring-white/10 dark:ring-white/5 shadow-neon">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-white opacity-5 rounded-full -ml-16 -mb-16 blur-2xl"></div>
 
                 <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center justify-between">
                     <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2 text-indigo-100">
+                        <div className="flex items-center gap-2 mb-2 text-primary-10">
                             <TrendingUp className="w-5 h-5" />
                             <span className="font-medium tracking-wide">PROGRESS KELENGKAPAN RPS</span>
                         </div>
                         <div className="text-5xl font-bold mb-2 tracking-tight">
                             {stats?.rpsStats?.completionRate}%
                         </div>
-                        <p className="text-indigo-100 opacity-90 max-w-md">
+                        <p className="text-primary-100 opacity-90 max-w-md">
                             Persentase mata kuliah yang telah memiliki dokumen RPS dengan status <b>Approved</b> untuk semester ini.
                         </p>
                     </div>
@@ -83,7 +83,7 @@ export default function KaprodiDashboard() {
                             <div className="text-2xl font-bold">{stats?.rpsStats?.total}</div>
                             <div className="text-xs uppercase tracking-wider opacity-70">Total MK</div>
                         </div>
-                        <div className="text-center px-4 border-r border-white/10 last:border-0 text-amber-300">
+                        <div className="text-center px-4 border-r border-white/10 last:border-0 text-accent-300">
                             <div className="text-2xl font-bold">{stats?.rpsStats?.pending}</div>
                             <div className="text-xs uppercase tracking-wider opacity-70">Butuh Review</div>
                         </div>
@@ -97,7 +97,7 @@ export default function KaprodiDashboard() {
                 {/* Progress Bar Visual */}
                 <div className="mt-8 bg-black/20 rounded-full h-3 overflow-hidden">
                     <div
-                        className="bg-green-400 h-full rounded-full shadow-[0_0_10px_rgba(74,222,128,0.5)] transition-all duration-1000"
+                        className="bg-accent-400 h-full rounded-full shadow-[0_0_10px_color-mix(in_srgb,var(--color-accent),transparent_50%)] transition-all duration-1000"
                         style={{ width: `${stats?.rpsStats?.completionRate}%` }}
                     ></div>
                 </div>
@@ -107,21 +107,21 @@ export default function KaprodiDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Pending Review Card */}
                 {stats?.rpsStats?.pending > 0 ? (
-                    <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl p-6 relative overflow-hidden group hover:shadow-md transition-shadow">
+                    <div className="bg-accent-50 dark:bg-accent-900/10 border border-accent-200 dark:border-accent-800 rounded-xl p-6 relative overflow-hidden group hover:shadow-md transition-shadow">
                         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <AlertTriangle className="w-24 h-24 text-amber-600" />
+                            <AlertTriangle className="w-24 h-24 text-accent-600" />
                         </div>
                         <div className="relative z-10">
-                            <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center text-amber-600 dark:text-amber-400 mb-4">
+                            <div className="w-12 h-12 bg-accent-100 dark:bg-accent-900/30 rounded-lg flex items-center justify-center text-accent-600 dark:text-accent-400 mb-4">
                                 <Clock className="w-6 h-6" />
                             </div>
-                            <h3 className="text-lg font-bold text-amber-900 dark:text-amber-100 mb-1">
+                            <h3 className="text-lg font-bold text-accent-900 dark:text-accent-100 mb-1">
                                 {stats.rpsStats.pending} Menunggu Review
                             </h3>
-                            <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">
+                            <p className="text-sm text-accent-700 dark:text-accent-300 mb-4">
                                 Dokumen RPS yang perlu Anda periksa dan setujui.
                             </p>
-                            <Link to="/kaprodi/rps?status=pending" className="inline-flex items-center text-sm font-semibold text-amber-700 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200">
+                            <Link to="/kaprodi/rps?status=pending" className="inline-flex items-center text-sm font-semibold text-accent-700 hover:text-accent-900 dark:text-accent-400 dark:hover:text-accent-200">
                                 Review Sekarang <ArrowRight className="w-4 h-4 ml-1" />
                             </Link>
                         </div>
@@ -141,8 +141,8 @@ export default function KaprodiDashboard() {
                 )}
 
                 {/* Assignment Shortcut */}
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 group hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
-                    <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4 group-hover:scale-110 transition-transform">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 group hover:border-primary-300 dark:hover:border-primary-700 transition-colors">
+                    <div className="w-12 h-12 bg-primary-50 dark:bg-primary-900/20 rounded-lg flex items-center justify-center text-primary-600 dark:text-primary-400 mb-4 group-hover:scale-110 transition-transform">
                         <Users className="w-6 h-6" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
@@ -151,14 +151,14 @@ export default function KaprodiDashboard() {
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                         Kelola tim teaching dan dosen pengampu mata kuliah.
                     </p>
-                    <Link to="/kaprodi/courses" className="inline-flex items-center text-sm font-semibold text-blue-600 hover:text-blue-700">
+                    <Link to="/kaprodi/courses" className="inline-flex items-center text-sm font-semibold text-primary-600 hover:text-primary-700">
                         Ke Data Mata Kuliah <ArrowRight className="w-4 h-4 ml-1" />
                     </Link>
                 </div>
 
                 {/* Master Data Shortcut */}
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 group hover:border-purple-300 dark:hover:border-purple-700 transition-colors">
-                    <div className="w-12 h-12 bg-purple-50 dark:bg-purple-900/20 rounded-lg flex items-center justify-center text-purple-600 dark:text-purple-400 mb-4 group-hover:scale-110 transition-transform">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 group hover:border-secondary-300 dark:hover:border-secondary-700 transition-colors">
+                    <div className="w-12 h-12 bg-secondary-50 dark:bg-secondary-900/20 rounded-lg flex items-center justify-center text-secondary-600 dark:text-secondary-400 mb-4 group-hover:scale-110 transition-transform">
                         <BookOpen className="w-6 h-6" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
@@ -167,7 +167,7 @@ export default function KaprodiDashboard() {
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                         Lihat struktur mata kuliah, CPL, dan pemetaan CPMK.
                     </p>
-                    <Link to="/kaprodi/curriculum" className="inline-flex items-center text-sm font-semibold text-purple-600 hover:text-purple-700">
+                    <Link to="/kaprodi/curriculum" className="inline-flex items-center text-sm font-semibold text-secondary-600 hover:text-secondary-700">
                         Kelola Kurikulum <ArrowRight className="w-4 h-4 ml-1" />
                     </Link>
                 </div>

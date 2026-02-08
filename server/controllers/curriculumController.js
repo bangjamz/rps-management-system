@@ -70,10 +70,8 @@ const getUniqueCode = async (Model, field, baseCode, prodiId, excludeId = null) 
 // ========== CPL ==========
 export const getCPLs = async (req, res) => {
     try {
-        const { prodi_id, role } = req.user;
-
-        // Super admin sees all, Kaprodi sees only their prodi
-        const whereClause = role === 'super_admin' ? {} : { prodi_id };
+        // Apply scope
+        const whereClause = { ...req.dataScope };
 
         const cpls = await CPL.findAll({
             where: whereClause,
@@ -289,8 +287,7 @@ export const importCPL = async (req, res) => {
 // ========== BAHAN KAJIAN ==========
 export const getBahanKajian = async (req, res) => {
     try {
-        const { prodi_id, role } = req.user;
-        const whereClause = role === 'super_admin' ? {} : { prodi_id };
+        const whereClause = { ...req.dataScope };
 
         const bks = await BahanKajian.findAll({
             where: whereClause,
@@ -633,8 +630,7 @@ export const importCPMK = async (req, res) => {
 
 export const getCPMKs = async (req, res) => {
     try {
-        const { prodi_id, role } = req.user;
-        const whereClause = role === 'super_admin' ? {} : { prodi_id };
+        const whereClause = { ...req.dataScope };
 
         const cpmks = await CPMK.findAll({
             where: whereClause,

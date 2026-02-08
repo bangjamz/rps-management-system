@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../lib/axios';
 import useAcademicStore from '../store/useAcademicStore';
@@ -396,13 +396,14 @@ export default function CoursesPage() {
     const [importMessage, setImportMessage] = useState(null);
 
     // Advanced Filters State
-    const { user } = useAuthStore();
+    // State Filter Lanjutan
+    const user = useAuthStore((state) => state.user); // Optimasi selector untuk mencegah render ulang yang tidak perlu
     const [selectedFakultas, setSelectedFakultas] = useState('');
     const [selectedProdi, setSelectedProdi] = useState('');
     const [fakultasList, setFakultasList] = useState([]);
     const [prodiList, setProdiList] = useState([]);
 
-    // Helper for theme-aware Swal
+    // Helper untuk Swal yang mendukung tema
     const getSwalConfig = (overrides = {}) => {
         const isDarkMode = document.documentElement.classList.contains('dark');
         return {
@@ -427,9 +428,32 @@ export default function CoursesPage() {
         }
     }, [user]);
 
+    // Menggunakan useCallback untuk loadCourses agar referensi fungsi stabil
+    const loadCourses = useCallback(async () => {
+        setLoading(true);
+        try {
+            const params = {
+                // semester: activeSemester, // Hapus filter semester di backend jika frontend sudah filter lokal
+                search: searchQuery
+            };
+
+            if (selectedFakultas) params.fakultasId = selectedFakultas;
+            if (selectedProdi) params.prodiId = selectedProdi;
+
+            const response = await axios.get('/courses', { params });
+            // console.log('DEBUG: Courses fetched:', response.data); // Hapus log debug untuk mengurangi spam
+            setCourses(response.data);
+        } catch (error) {
+            console.error('Gagal memuat mata kuliah:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [selectedFakultas, selectedProdi, searchQuery]); // Hapus activeSemester dari dependency array loadCourses jika tidak dikirim ke params
+
+    // Effect untuk memanggil loadCourses saat dependency berubah
     useEffect(() => {
         loadCourses();
-    }, [selectedFakultas, selectedProdi, searchQuery, activeSemester]); // Add dependencies
+    }, [loadCourses]); // Dependency array effect sekarang hanya loadCourses
 
     const fetchFilters = async () => {
         try {
@@ -445,28 +469,7 @@ export default function CoursesPage() {
                 setProdiList(prodiRes.data);
             }
         } catch (error) {
-            console.error('Failed to fetch filters:', error);
-        }
-    };
-
-    const loadCourses = async () => {
-        setLoading(true);
-        try {
-            const params = {
-                // semester: activeSemester, // Removed to fix bug: Backend expects int, frontend has string. Filter locally.
-                search: searchQuery
-            };
-
-            if (selectedFakultas) params.fakultasId = selectedFakultas;
-            if (selectedProdi) params.prodiId = selectedProdi;
-
-            const response = await axios.get('/courses', { params });
-            console.log('DEBUG: Courses fetched:', response.data);
-            setCourses(response.data);
-        } catch (error) {
-            console.error('Failed to load courses:', error);
-        } finally {
-            setLoading(false);
+            console.error('Gagal memuat filter:', error);
         }
     };
 

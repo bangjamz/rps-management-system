@@ -35,9 +35,9 @@ export default function SettingsPage() {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
 
-    // Fetch Academic Years on Mount (if Kaprodi)
+    // Fetch Academic Years on Mount
     useEffect(() => {
-        if (user?.role === ROLES.KAPRODI || user?.role === 'admin_institusi') {
+        if (user?.role === ROLES.KAPRODI || user?.role === 'admin_institusi' || user?.role === 'superadmin' || user?.role === 'admin') {
             fetchAcademicYears();
         }
     }, [user]);
@@ -46,6 +46,8 @@ export default function SettingsPage() {
         try {
             const response = await axios.get('/academic-years');
             setAcademicYears(response.data);
+            // Sync with global store for header dropdown
+            useAcademicStore.getState().setAcademicYears(response.data);
         } catch (error) {
             console.error('Failed to fetch academic years:', error);
         }
@@ -260,8 +262,8 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                {/* Academic Settings (Kaprodi Only) */}
-                {(user?.role === ROLES.KAPRODI || user?.role === 'admin_institusi') && (
+                {/* Academic Settings (Kaprodi, Admin, Super Admin) */}
+                {(user?.role === ROLES.KAPRODI || user?.role === 'admin_institusi' || user?.role === 'superadmin' || user?.role === 'admin') && (
                     <div className="card p-6">
                         <div className="flex items-center justify-between mb-6">
                             <div>
@@ -270,12 +272,14 @@ export default function SettingsPage() {
                                 </h2>
                                 <p className="text-sm text-gray-500">Kelola tahun akademik dan semester aktif sistem.</p>
                             </div>
-                            <button
-                                onClick={() => setIsAddingYear(!isAddingYear)}
-                                className="btn btn-primary btn-sm flex items-center gap-1"
-                            >
-                                <Plus className="w-4 h-4" /> Tambah Tahun
-                            </button>
+                            {(user?.role === 'superadmin' || user?.role === 'admin') && (
+                                <button
+                                    onClick={() => setIsAddingYear(!isAddingYear)}
+                                    className="btn btn-primary btn-sm flex items-center gap-1"
+                                >
+                                    <Plus className="w-4 h-4" /> Tambah Tahun
+                                </button>
+                            )}
                         </div>
 
                         {isAddingYear && (
@@ -317,28 +321,41 @@ export default function SettingsPage() {
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <button
-                                                    onClick={() => handleActivateYear(year.id, 'Ganjil')}
-                                                    className={`px-3 py-1 rounded text-xs border ${year.is_active && year.active_semester === 'Ganjil'
-                                                        ? 'bg-primary-600 text-white border-primary-600 cursor-default'
-                                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                                        }`}
-                                                    disabled={year.is_active && year.active_semester === 'Ganjil'}
-                                                >
-                                                    {year.is_active && year.active_semester === 'Ganjil' ? 'Sedang Aktif' : 'Aktifkan'}
-                                                </button>
+                                                {/* Activation is Super Admin / Admin only */}
+                                                {(user?.role === 'superadmin' || user?.role === 'admin') ? (
+                                                    <button
+                                                        onClick={() => handleActivateYear(year.id, 'Ganjil')}
+                                                        className={`px-3 py-1 rounded text-xs border ${year.is_active && year.active_semester === 'Ganjil'
+                                                            ? 'bg-primary-600 text-white border-primary-600 cursor-default'
+                                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                            }`}
+                                                        disabled={year.is_active && year.active_semester === 'Ganjil'}
+                                                    >
+                                                        {year.is_active && year.active_semester === 'Ganjil' ? 'Sedang Aktif' : 'Aktifkan'}
+                                                    </button>
+                                                ) : (
+                                                    <span className={`text-xs ${year.is_active && year.active_semester === 'Ganjil' ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                                                        {year.is_active && year.active_semester === 'Ganjil' ? 'Sedang Aktif' : '-'}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <button
-                                                    onClick={() => handleActivateYear(year.id, 'Genap')}
-                                                    className={`px-3 py-1 rounded text-xs border ${year.is_active && year.active_semester === 'Genap'
-                                                        ? 'bg-primary-600 text-white border-primary-600 cursor-default'
-                                                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                                                        }`}
-                                                    disabled={year.is_active && year.active_semester === 'Genap'}
-                                                >
-                                                    {year.is_active && year.active_semester === 'Genap' ? 'Sedang Aktif' : 'Aktifkan'}
-                                                </button>
+                                                {(user?.role === 'superadmin' || user?.role === 'admin') ? (
+                                                    <button
+                                                        onClick={() => handleActivateYear(year.id, 'Genap')}
+                                                        className={`px-3 py-1 rounded text-xs border ${year.is_active && year.active_semester === 'Genap'
+                                                            ? 'bg-primary-600 text-white border-primary-600 cursor-default'
+                                                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                                                            }`}
+                                                        disabled={year.is_active && year.active_semester === 'Genap'}
+                                                    >
+                                                        {year.is_active && year.active_semester === 'Genap' ? 'Sedang Aktif' : 'Aktifkan'}
+                                                    </button>
+                                                ) : (
+                                                    <span className={`text-xs ${year.is_active && year.active_semester === 'Genap' ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+                                                        {year.is_active && year.active_semester === 'Genap' ? 'Sedang Aktif' : '-'}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <button className="text-gray-400 hover:text-gray-600">

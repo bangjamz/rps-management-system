@@ -10,20 +10,90 @@ export const exportRPSToPDF = async (course, rpsData) => {
         // Helper to parse JSON strings if needed
         const safeParse = (val) => {
             if (typeof val === 'string') {
-                if (val.startsWith('[') || val.startsWith('{')) {
+                if (val.trim().startsWith('[') || val.trim().startsWith('{')) {
                     try { return JSON.parse(val); } catch (e) { return val; }
                 }
             }
             return val;
         };
 
+        // Advanced helper to extract clean tags and remove array artifacts (Recursive)
+        const extractTags = (v) => {
+            if (!v) return [];
+
+            let list = [];
+            if (Array.isArray(v)) {
+                list = v.flat(Infinity);
+            } else if (typeof v === 'string') {
+                try {
+                    const parsed = JSON.parse(v);
+                    list = Array.isArray(parsed) ? parsed : [v];
+                } catch (e) {
+                    const trimmed = v.trim().replace(/^"+|"+$/g, '');
+                    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                        list = trimmed.slice(1, -1).split(',').map(s => s.trim());
+                    } else {
+                        list = [v];
+                    }
+                }
+            } else {
+                return [];
+            }
+
+            const cleanItems = [];
+            for (let item of list) {
+                if (!item) continue;
+                let s = String(item).trim();
+
+                // Recursive cleanup: if item looks like a stringified array
+                if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('"[') && s.endsWith(']"'))) {
+                    const nested = extractTags(s);
+                    cleanItems.push(...nested);
+                    continue;
+                }
+
+                // Strip quotes
+                s = s.replace(/^['"]+|['"]+$/g, '');
+
+                // Filter garbage
+                if (s && s !== '' && s !== '[]' && s.toLowerCase() !== 'null' && s.toLowerCase() !== 'undefined') {
+                    cleanItems.push(s);
+                }
+            }
+            return [...new Set(cleanItems)];
+        };
+
+        // Helper to parse Indikator into a clean numbered string
+        const parseIndikator = (val) => {
+            const list = extractTags(val);
+            if (list.length === 0) return '-';
+            if (list.length === 1) return list[0];
+            return list.map((item, idx) => `${idx + 1}. ${item}`).join('\n');
+        };
+
+        // Fetch Global Settings for Logo & PT Name
+        let globalSettings = null;
+        try {
+            const settingsRes = await axios.get('/settings');
+            globalSettings = settingsRes.data;
+        } catch (e) {
+            console.warn('Failed to fetch settings for PDF:', e);
+        }
+
         // Add logo
         try {
-            const logoImg = await loadImage('/logo-mahardika.jpg');
+            const logoPath = globalSettings?.logo_path ? `${import.meta.env.VITE_API_URL}/${globalSettings.logo_path}` : '/logo-mahardika.jpg';
+            const logoImg = await loadImage(logoPath);
             doc.addImage(logoImg, 'JPEG', margin, 10, 20, 20);
         } catch (error) {
             console.warn('Logo not loaded:', error);
-            // Continue without logo instead of crashing
+            // Fallback to default if custom fails
+            try {
+                const defaultLogo = await loadImage('/logo-mahardika.jpg');
+                doc.addImage(defaultLogo, 'JPEG', margin, 10, 20, 20);
+            } catch (e2) {
+                console.warn('Default logo also failed');
+            }
         }
 
         // Header text
@@ -31,15 +101,16 @@ export const exportRPSToPDF = async (course, rpsData) => {
         doc.setFont('helvetica', 'bold');
         doc.text('RENCANA PEMBELAJARAN SEMESTER', pageWidth / 2, 15, { align: 'center' });
 
-        // Dynamic Prodi/Fakultas from MK if available
-        const prodiName = course?.prodi?.nama || rpsData?.mata_kuliah?.prodi?.nama || 'S1 INFORMATIKA';
-        const fakultasName = rpsData?.mata_kuliah?.prodi?.fakultas?.nama || 'TEKNIK';
+        // Dynamic Prodi/Fakultas from MK
+        const prodiName = course?.prodi?.nama || rpsData?.mata_kuliah?.prodi?.nama || '-';
+        const fakultasName = course?.prodi?.fakultas?.nama || rpsData?.mata_kuliah?.prodi?.fakultas?.nama || '-';
+        const ptName = globalSettings?.nama_pt || 'INSTITUT TEKNOLOGI DAN KESEHATAN MAHARDIKA';
 
         doc.setFontSize(11);
         doc.text(`PROGRAM STUDI ${prodiName.toUpperCase()}`, pageWidth / 2, 21, { align: 'center' });
         doc.setFontSize(10);
         doc.text(`FAKULTAS ${fakultasName.toUpperCase()}`, pageWidth / 2, 27, { align: 'center' });
-        doc.text('INSTITUT TEKNOLOGI DAN KESEHATAN MAHARDIKA', pageWidth / 2, 32, { align: 'center' });
+        doc.text(ptName.toUpperCase(), pageWidth / 2, 32, { align: 'center' });
 
         let yPos = 40;
 
@@ -171,77 +242,114 @@ export const exportRPSToPDF = async (course, rpsData) => {
         // Flatten logic for Week 1-16, respecting ranges
         const tableBody = [];
 
-        // We will iterate 1..16, but we need to check if a week is covered by a previous merged row
+        const sortedPertemuan = [...pertemuanData].sort((a, b) => (a.minggu_ke || 0) - (b.minggu_ke || 0));
         let skipUntil = 0;
 
-        for (let i = 1; i <= 16; i++) {
-            if (i <= skipUntil) continue;
+        sortedPertemuan.forEach((pertemuan) => {
+            const i = pertemuan.minggu_ke;
+            if (i <= skipUntil) return;
 
-            // Find a row starting at this week
-            const pertemuan = pertemuanData.find(p => p.minggu_ke === i);
+            // If it covers multiple weeks
+            const endWeek = pertemuan.sampai_minggu_ke || i;
+            if (endWeek > i) skipUntil = endWeek;
 
-            if (pertemuan) {
-                // If it covers multiple weeks
-                const endWeek = pertemuan.sampai_minggu_ke || i;
-                if (endWeek > i) skipUntil = endWeek;
+            const weekLabel = (endWeek > i) ? `${i}-${endWeek}` : i.toString();
 
-                const weekLabel = (endWeek > i) ? `${i}-${endWeek}` : i.toString();
-
-                if (pertemuan.is_uts || i === 8 && pertemuan.materi?.includes('UTS')) {
-                    tableBody.push([
-                        { content: weekLabel, styles: { halign: 'center', fontStyle: 'bold' } },
-                        { content: 'EVALUASI TENGAH SEMESTER (UTS)', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } },
-                        { content: pertemuan.bobot_penilaian || '22', styles: { halign: 'center' } }
-                    ]);
-                    continue;
-                }
-                if (pertemuan.is_uas || i === 16 && pertemuan.materi?.includes('UAS')) {
-                    tableBody.push([
-                        { content: weekLabel, styles: { halign: 'center', fontStyle: 'bold' } },
-                        { content: 'EVALUASI AKHIR SEMESTER (UAS)', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } },
-                        { content: pertemuan.bobot_penilaian || '26', styles: { halign: 'center' } }
-                    ]);
-                    continue;
-                }
-
-                const bentukPembelajaran = safeParse(pertemuan.bentuk_pembelajaran || []);
-                const metodePembelajaran = safeParse(pertemuan.metode_pembelajaran || []);
-
-                const bentukMetode = [
-                    bentukPembelajaran && (Array.isArray(bentukPembelajaran) ? bentukPembelajaran.length > 0 : bentukPembelajaran) ? `Bentuk: ${Array.isArray(bentukPembelajaran) ? bentukPembelajaran.join(', ') : bentukPembelajaran}` : '',
-                    metodePembelajaran && (Array.isArray(metodePembelajaran) ? metodePembelajaran.length > 0 : metodePembelajaran) ? `Metode: ${Array.isArray(metodePembelajaran) ? metodePembelajaran.join(', ') : metodePembelajaran}` : '',
-                ].filter(Boolean).join('\n');
-
+            if (pertemuan.is_uts || i === 8 && pertemuan.materi?.includes('UTS')) {
                 tableBody.push([
-                    { content: weekLabel, styles: { halign: 'center' } },
-                    pertemuan.sub_cpmk || '-',
-                    pertemuan.indikator || '-',
-                    bentukMetode || '-',
-                    pertemuan.materi || '-',
-                    { content: pertemuan.bobot_penilaian?.toString() || '0', styles: { halign: 'center' } }
+                    { content: weekLabel, styles: { halign: 'center', fontStyle: 'bold' } },
+                    { content: 'EVALUASI TENGAH SEMESTER (UTS)', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } },
+                    { content: pertemuan.bobot_penilaian || '22', styles: { halign: 'center' } }
                 ]);
-            } else {
-                // Empty week (optional: show empty row or skip)
-                // For PDF, standard often requires showing all weeks? 
-                // But user complained about "too many rows".
-                // If we want "neat" PDF, maybe just show empty row for single week.
-                tableBody.push([
-                    { content: i.toString(), styles: { halign: 'center' } },
-                    '-', '-', '-', '-', '0'
-                ]);
+                return;
             }
-        }
+            if (pertemuan.is_uas || i === 16 && pertemuan.materi?.includes('UAS')) {
+                tableBody.push([
+                    { content: weekLabel, styles: { halign: 'center', fontStyle: 'bold' } },
+                    { content: 'EVALUASI AKHIR SEMESTER (UAS)', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold' } },
+                    { content: pertemuan.bobot_penilaian || '26', styles: { halign: 'center' } }
+                ]);
+                return;
+            }
+
+            const metodeLuring = extractTags(pertemuan.metode_pembelajaran);
+            const namaLms = pertemuan.nama_lms ? String(pertemuan.nama_lms).trim() : '';
+            const platform = pertemuan.link_meet_platform ? String(pertemuan.link_meet_platform).trim() : '';
+            const link = pertemuan.link_daring ? String(pertemuan.link_daring).trim() : '';
+            const penugasan = pertemuan.penugasan ? String(pertemuan.penugasan).trim() : '';
+
+            const bentukMetodeParts = [];
+
+            if (metodeLuring.length > 0) {
+                bentukMetodeParts.push(`Metode Luring:\n${metodeLuring.join(', ')}`);
+            }
+
+            if (namaLms || platform || link) {
+                const daringLines = ['Metode Daring:'];
+                if (namaLms) daringLines.push(`LMS: ${namaLms}`);
+                if (platform) daringLines.push(`Platform: ${platform}`);
+                if (link) daringLines.push(`Link: ${link}`);
+                bentukMetodeParts.push(daringLines.join('\n'));
+            }
+
+            if (penugasan) {
+                bentukMetodeParts.push(`Penugasan:\n${penugasan}`);
+            }
+
+            const bentukMetode = bentukMetodeParts.join('\n\n');
+
+            // Indikator & Kriteria Combined
+            const indikatorList = extractTags(pertemuan.indikator);
+            const indikatorSection = indikatorList.length > 0
+                ? `Indikator:\n${indikatorList.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}`
+                : '';
+
+            const kriteriaParts = [];
+            if (pertemuan.kriteria_penilaian) {
+                kriteriaParts.push(`Kriteria:\n${pertemuan.kriteria_penilaian}`);
+            }
+            if (pertemuan.teknik_penilaian && Array.isArray(pertemuan.teknik_penilaian) && pertemuan.teknik_penilaian.length > 0) {
+                kriteriaParts.push(`Teknik: ${pertemuan.teknik_penilaian.join(', ')}`);
+            }
+
+            const kriteriaSection = kriteriaParts.join('\n');
+            const indikatorKriteriaText = [indikatorSection, kriteriaSection].filter(Boolean).join('\n\n');
+
+            tableBody.push([
+                { content: weekLabel, styles: { halign: 'center' } },
+                pertemuan.sub_cpmk || '-',
+                indikatorKriteriaText || '-',
+                bentukMetode || '-',
+                pertemuan.materi || '-',
+                { content: pertemuan.bobot_penilaian?.toString() || '0', styles: { halign: 'center' } }
+            ]);
+        });
 
         autoTable(doc, {
             startY: 20,
-            head: [['Mg', 'Sub-CPMK / Kemampuan Akhir', 'Indikator', 'Bentuk & Metode Pembelajaran', 'Materi', 'Bobot']],
+            head: [['Mg Ke-', 'Kemampuan Akhir Tiap Tahapan Belajar (Sub-CPMK)', 'Indikator & Kriteria', 'Bentuk, Metode, & Penugasan', 'Materi Pembelajaran', 'Bobot (%)']],
             body: tableBody,
             theme: 'grid',
-            styles: { fontSize: 7 },
-            headStyles: { fillColor: [100, 100, 100], halign: 'center' },
+            styles: {
+                fontSize: 7,
+                valign: 'middle',
+                overflow: 'linebreak',
+                cellPadding: 2
+            },
+            headStyles: {
+                fillColor: [80, 80, 80],
+                halign: 'center',
+                valign: 'middle',
+                fontSize: 7,
+                fontStyle: 'bold'
+            },
             columnStyles: {
-                0: { cellWidth: 10 },
-                5: { cellWidth: 12 }
+                0: { cellWidth: 10, halign: 'center' },
+                1: { cellWidth: 40 },
+                2: { cellWidth: 35 },
+                3: { cellWidth: 35 },
+                4: { cellWidth: 45 },
+                5: { cellWidth: 12, halign: 'center' }
             }
         });
 

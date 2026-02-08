@@ -11,6 +11,19 @@ export default function RPSViewPage() {
     const [existingRPS, setExistingRPS] = useState(null);
     const [course, setCourse] = useState(null);
     const [editMode, setEditMode] = useState(false);
+    const [settings, setSettings] = useState(null);
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const res = await axios.get('/settings');
+                setSettings(res.data);
+            } catch (err) {
+                console.error('Failed to load global settings:', err);
+            }
+        };
+        fetchSettings();
+    }, []);
 
     useEffect(() => {
         loadRPSData();
@@ -136,7 +149,7 @@ export default function RPSViewPage() {
 
                 {/* RPS Document - Scrollable on mobile */}
                 <div className="overflow-x-auto">
-                    <div className="bg-white text-black shadow-lg print:shadow-none p-4 sm:p-6 md:p-10 print:p-0 text-[11px] sm:text-[12px] leading-tight font-serif min-w-[800px] sm:min-w-0">
+                    <div className="bg-white text-black shadow-lg print:shadow-none p-4 sm:p-6 md:p-10 print:p-0 text-[11px] sm:text-[12px] leading-[1.15] font-serif min-w-[800px] sm:min-w-0">
 
 
                         {/* Header Table */}
@@ -145,16 +158,23 @@ export default function RPSViewPage() {
                                 <tr>
                                     <td className="border border-black p-2 w-24 text-center align-middle">
                                         <img
-                                            src="/logo-mahardika.jpg"
+                                            src={settings?.logo_path ? `${import.meta.env.VITE_API_URL}/${settings.logo_path}` : "/logo-mahardika.jpg"}
                                             alt="Logo"
                                             className="w-20 h-20 object-contain mx-auto"
+                                            onError={(e) => { e.target.src = "/logo-mahardika.jpg"; }}
                                         />
                                     </td>
                                     <td className="border border-black p-2 text-center align-middle">
                                         <h1 className="font-bold text-lg">RENCANA PEMBELAJARAN SEMESTER</h1>
-                                        <h2 className="font-bold text-base">PROGRAM STUDI S1 INFORMATIKA</h2>
-                                        <h3 className="font-bold">FAKULTAS TEKNIK</h3>
-                                        <h3 className="font-bold">INSTITUT TEKNOLOGI DAN KESEHATAN MAHARDIKA</h3>
+                                        <h2 className="font-bold text-base">
+                                            PROGRAM STUDI {course?.prodi?.nama?.toUpperCase() || '-'}
+                                        </h2>
+                                        <h3 className="font-bold uppercase">
+                                            {course?.prodi?.fakultas?.nama || '-'}
+                                        </h3>
+                                        <h3 className="font-bold uppercase">
+                                            {settings?.nama_pt || 'INSTITUT TEKNOLOGI DAN KESEHATAN MAHARDIKA'}
+                                        </h3>
                                     </td>
                                 </tr>
                             </tbody>
@@ -457,80 +477,190 @@ export default function RPSViewPage() {
                                                             week
                                                         }
                                                     </td>
-                                                    <td className="border border-black p-1 align-top whitespace-pre-line text-sm font-semibold">{pertemuan?.sub_cpmk || '-'}</td>
-                                                    <td className="border border-black p-1 align-top whitespace-pre-line">
+                                                    <td className="border border-black p-1 align-top whitespace-pre-line font-semibold">{pertemuan?.sub_cpmk || '-'}</td>
+                                                    <td className="border border-black p-1 align-top">
                                                         <div className="font-semibold mb-1 border-b border-gray-300 pb-1">Indikator:</div>
-                                                        {pertemuan?.indikator || '-'}
-                                                        {pertemuan?.kriteria_penilaian && (
-                                                            <>
-                                                                <div className="font-semibold mt-2 mb-1 border-b border-gray-300 pb-1">Kriteria:</div>
-                                                                <div className="whitespace-pre-line">{pertemuan.kriteria_penilaian}</div>
-                                                            </>
+                                                        <div className="pl-4">
+                                                            {(() => {
+                                                                const parseIndikator = (val) => {
+                                                                    if (!val) return [];
+                                                                    if (Array.isArray(val)) return val;
+                                                                    if (typeof val === 'string') {
+                                                                        try {
+                                                                            // Try parsing if it looks like an array
+                                                                            if (val.trim().startsWith('[')) {
+                                                                                const parsed = JSON.parse(val);
+                                                                                if (Array.isArray(parsed)) return parsed.flat();
+                                                                            }
+                                                                        } catch (e) { /* ignore */ }
+                                                                        // Handle single string or failed parse
+                                                                        return [val];
+                                                                    }
+                                                                    return [String(val)];
+                                                                };
+
+                                                                const indikators = parseIndikator(pertemuan?.indikator).filter(i => i && String(i).trim() !== '' && i !== '[]');
+
+                                                                if (indikators.length > 0) {
+                                                                    return (
+                                                                        <ol className="list-decimal space-y-1">
+                                                                            {indikators.map((ind, i) => (
+                                                                                <li key={i}><MarkdownText text={String(ind)} className="leading-none" /></li>
+                                                                            ))}
+                                                                        </ol>
+                                                                    );
+                                                                } else {
+                                                                    return <div className="text-gray-400">-</div>;
+                                                                }
+                                                            })()}
+                                                        </div>
+
+                                                        {/* Kriteria & Teknik Combined */}
+                                                        {(pertemuan?.kriteria_penilaian || (pertemuan?.teknik_penilaian && pertemuan.teknik_penilaian.length > 0)) && (
+                                                            <div className="mt-3 pt-2 border-t border-gray-300 border-dashed">
+                                                                {pertemuan?.kriteria_penilaian && (
+                                                                    <div className="mb-2">
+                                                                        <div className="font-semibold mb-1 text-gray-600 text-[10px] uppercase">Kriteria:</div>
+                                                                        <MarkdownText text={pertemuan.kriteria_penilaian} className="leading-none" />
+                                                                    </div>
+                                                                )}
+
+                                                                {pertemuan?.teknik_penilaian && pertemuan.teknik_penilaian.length > 0 && (
+                                                                    <div>
+                                                                        <div className="font-semibold mb-1 text-gray-600 text-[10px] uppercase">Teknik:</div>
+                                                                        <div className="flex flex-wrap gap-1">
+                                                                            {pertemuan.teknik_penilaian.map(t => (
+                                                                                <span key={t} className="px-1.5 py-0.5 bg-gray-100 border rounded text-[10px] whitespace-nowrap">{t}</span>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         )}
                                                     </td>
                                                     <td className="border border-black p-0 align-top">
-                                                        {/* Helper for cleaning */}
                                                         {(() => {
-                                                            const clean = (v) => {
-                                                                if (!v) return '-';
+                                                            // Helper: Extract clean tags from potential messy string/array
+                                                            const extractTags = (v) => {
+                                                                if (!v) return [];
 
-                                                                let parsedV = v;
-                                                                // Recursively parse JSON strings until we get a real value
-                                                                let attempts = 0;
-                                                                while (typeof parsedV === 'string' && (parsedV.startsWith('[') || parsedV.startsWith('"')) && attempts < 5) {
+                                                                // 1. Force into array structure first
+                                                                let list = [];
+                                                                if (Array.isArray(v)) {
+                                                                    list = v.flat(Infinity);
+                                                                } else if (typeof v === 'string') {
+                                                                    // Try JSON parse first
                                                                     try {
-                                                                        const temp = JSON.parse(parsedV);
-                                                                        // If we got a string from JSON.parse, continue loop. 
-                                                                        // If we got an object/array, that's our new parsedV.
-                                                                        parsedV = temp;
+                                                                        const parsed = JSON.parse(v);
+                                                                        if (Array.isArray(parsed)) list = parsed;
+                                                                        else list = [v];
                                                                     } catch (e) {
-                                                                        break; // Stop if parse fails
+                                                                        // Fallback: split by comma if it looks like a list, or just use string
+                                                                        const trimmed = v.trim().replace(/^"+|"+$/g, ''); // Remove wrapping quotes
+                                                                        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                                                                            // It's a stringified array that failed JSON.parse (e.g. single quotes)
+                                                                            list = trimmed.slice(1, -1).split(',').map(s => s.trim());
+                                                                        } else {
+                                                                            list = [v];
+                                                                        }
                                                                     }
-                                                                    attempts++;
+                                                                } else {
+                                                                    return [];
                                                                 }
 
-                                                                if (Array.isArray(parsedV)) {
-                                                                    // Recursively clean elements
-                                                                    const filtered = parsedV
-                                                                        .flat(Infinity)
-                                                                        .map(item => clean(item))
-                                                                        .filter(x => x && x !== '-' && x !== '""' && x !== "''" && x !== '[]' && x !== '[""]' && String(x).trim() !== '');
+                                                                // 2. Clean each item recursively
+                                                                const dirtyItems = list.flat(Infinity);
+                                                                const cleanItems = [];
 
-                                                                    return filtered.length > 0 ? filtered.join(', ') : '-';
+                                                                for (let item of dirtyItems) {
+                                                                    if (!item) continue;
+                                                                    let s = String(item).trim();
+
+                                                                    // Recursive cleanup: if item looks like ["..."]
+                                                                    if ((s.startsWith('[') && s.endsWith(']')) || (s.startsWith('"[') && s.endsWith(']"'))) {
+                                                                        const nested = extractTags(s);
+                                                                        cleanItems.push(...nested);
+                                                                        continue;
+                                                                    }
+
+                                                                    // Strip quotes
+                                                                    s = s.replace(/^['"]+|['"]+$/g, '');
+
+                                                                    // Filter garbage
+                                                                    if (s && s !== '' && s !== '[]' && s.toLowerCase() !== 'null' && s.toLowerCase() !== 'undefined') {
+                                                                        cleanItems.push(s);
+                                                                    }
                                                                 }
 
-                                                                // Handle single string case that might be "[]"
-                                                                if (typeof parsedV === 'string') {
-                                                                    if (parsedV === '[]' || parsedV === '[""]' || parsedV === '[" "]' || parsedV.trim() === '') return '-';
-                                                                    return parsedV;
-                                                                }
-
-                                                                return parsedV || '-';
+                                                                return [...new Set(cleanItems)]; // Unique items only
                                                             };
+
+                                                            const metode = extractTags(pertemuan?.metode_pembelajaran);
+                                                            const namaLms = pertemuan?.nama_lms || '';
+                                                            const platform = pertemuan?.link_meet_platform || '';
+                                                            const link = pertemuan?.link_daring || '';
+                                                            const penugasan = pertemuan?.penugasan || '';
+
+                                                            const hasLuring = metode.length > 0;
+                                                            const hasDaring = namaLms || platform || link;
+                                                            const hasPenugasan = !!penugasan;
+
+                                                            if (!hasLuring && !hasDaring && !hasPenugasan) {
+                                                                return <div className="text-center text-gray-400 p-2">-</div>;
+                                                            }
 
                                                             return (
                                                                 <div className="flex flex-col h-full">
-                                                                    <div className="border-b border-black p-1 flex-1">
-                                                                        <span className="font-semibold block text-[10px] text-gray-600 uppercase">Bentuk:</span>
-                                                                        {clean(pertemuan?.bentuk_pembelajaran)}
-                                                                    </div>
-                                                                    <div className="border-b border-black p-1 flex-1">
-                                                                        <span className="font-semibold block text-[10px] text-gray-600 uppercase">Metode:</span>
-                                                                        {clean(pertemuan?.metode_pembelajaran)}
-                                                                    </div>
-                                                                    <div className="border-b border-black p-1 flex-1">
-                                                                        <span className="font-semibold block text-[10px] text-gray-600 uppercase">Penugasan:</span>
-                                                                        {clean(pertemuan?.penugasan) || '-'}
-                                                                    </div>
-                                                                    <div className="p-1">
-                                                                        <span className="font-semibold block text-[10px] text-gray-600 uppercase">Luring/Daring:</span>
-                                                                        {pertemuan?.link_daring ? 'Daring' : 'Luring'}
-                                                                    </div>
+                                                                    {/* ROW 1: Metode Luring (Show only if exists) */}
+                                                                    {hasLuring && (
+                                                                        <div className={`p-1 ${hasDaring || hasPenugasan ? 'border-b border-black' : ''} h-full min-h-[40px]`}>
+                                                                            <div className="font-bold text-[10px] underline mb-0.5">Metode Luring:</div>
+                                                                            <div className="text-[10px] leading-tight">
+                                                                                {metode.join(', ')}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* ROW 2: Metode Daring (Show only if exists) */}
+                                                                    {hasDaring && (
+                                                                        <div className={`p-1 ${hasPenugasan ? 'border-b border-black' : ''} h-full min-h-[40px] bg-blue-50/30`}>
+                                                                            <div className="font-bold text-[10px] underline mb-0.5 text-blue-800">Metode Daring:</div>
+                                                                            <div className="text-[10px] leading-tight space-y-0.5">
+                                                                                {namaLms && (
+                                                                                    <div>
+                                                                                        <span className="font-semibold">LMS:</span>{' '}
+                                                                                        <a
+                                                                                            href={namaLms.startsWith('http') ? namaLms : `https://${namaLms}`}
+                                                                                            target="_blank"
+                                                                                            rel="noreferrer"
+                                                                                            className="text-blue-600 hover:underline"
+                                                                                        >
+                                                                                            {namaLms}
+                                                                                        </a>
+                                                                                    </div>
+                                                                                )}
+                                                                                {platform && <div><span className="font-semibold">Platform:</span> {platform}</div>}
+                                                                                {link && (
+                                                                                    <div className="font-semibold"><a href={link} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all">{link}</a></div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* ROW 3: Penugasan (Show only if exists) */}
+                                                                    {hasPenugasan && (
+                                                                        <div className="p-1 h-full min-h-[40px] bg-green-50/30">
+                                                                            <div className="font-bold text-[10px] underline mb-0.5 text-green-800">Penugasan:</div>
+                                                                            <div className="text-[10px] leading-tight">
+                                                                                <MarkdownText text={penugasan} />
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             );
                                                         })()}
                                                     </td>
-                                                    <td className="border border-black p-1 align-top whitespace-pre-line">{pertemuan?.materi || '-'}</td>
+                                                    <td className="border border-black p-1 align-top"><MarkdownText text={pertemuan?.materi} /></td>
                                                     <td className="border border-black p-1 text-center align-top">{pertemuan?.bobot_penilaian || 0}</td>
                                                 </tr>
                                             );
@@ -595,7 +725,86 @@ export default function RPSViewPage() {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
+const MarkdownText = ({ text, className = '' }) => {
+    if (!text) return '-';
+
+    // Split by newlines to handle block elements (lists)
+    const lines = text.split('\n');
+    const elements = [];
+
+    let currentList = null; // { type: 'ul'|'ol', items: [] }
+
+    lines.forEach((line, i) => {
+        const trimmed = line.trim();
+        // Check for Bullet List (- item)
+        const ulMatch = line.match(/^-\s+(.+)/);
+        // Check for Numbered List (1. item)
+        const olMatch = line.match(/^\d+\.\s+(.+)/);
+
+        if (ulMatch) {
+            if (currentList && currentList.type !== 'ul') {
+                elements.push(renderList(currentList, `list-${i}`));
+                currentList = null;
+            }
+            if (!currentList) currentList = { type: 'ul', items: [] };
+            currentList.items.push(ulMatch[1]);
+        } else if (olMatch) {
+            if (currentList && currentList.type !== 'ol') {
+                elements.push(renderList(currentList, `list-${i}`));
+                currentList = null;
+            }
+            if (!currentList) currentList = { type: 'ol', items: [] };
+            currentList.items.push(olMatch[1]);
+        } else {
+            // Close list if open
+            if (currentList) {
+                elements.push(renderList(currentList, `list-${i}`));
+                currentList = null;
+            }
+            // Regular line (preserve empty lines as breaks if needed, or just min-height)
+            if (trimmed === '') {
+                elements.push(<br key={`br-${i}`} />);
+            } else {
+                elements.push(<div key={`text-${i}`}>{parseInline(line)}</div>);
+            }
+        }
+    });
+
+    // Flush remaining list
+    if (currentList) elements.push(renderList(currentList, 'list-end'));
+
+    return <div className={`whitespace-pre-wrap ${className}`}>{elements}</div>;
+};
+
+const renderList = (list, key) => {
+    const Tag = list.type;
+    return (
+        <Tag key={key} className={`list-inside mb-1 pl-2 ${list.type === 'ul' ? 'list-disc' : 'list-decimal'}`}>
+            {list.items.map((item, i) => <li key={i}>{parseInline(item)}</li>)}
+        </Tag>
+    );
+};
+
+const parseInline = (text) => {
+    // Simple bold/italic parser for **bold** and *italic*
+    // We split by specific regex to capture the tokens
+    if (!text) return '';
+
+    // Regex to match **bold** OR *italic*
+    // Note: This simple regex doesn't handle nested **bold *italic*** well, but sufficient for simple usage
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+
+    return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith('*') && part.endsWith('*')) {
+            return <em key={i}>{part.slice(1, -1)}</em>;
+        }
+        return part;
+    });
+};

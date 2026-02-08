@@ -1,5 +1,6 @@
 import { User, MataKuliah, RPS, Mahasiswa, Prodi, Fakultas } from '../models/index.js';
 import { ROLES } from '../middleware/auth.js';
+import { Op } from 'sequelize';
 
 /**
  * Get role-specific dashboard statistics
@@ -13,6 +14,11 @@ export const getDashboardStats = async (req, res) => {
         let stats = {};
 
         switch (role) {
+            case ROLES.SUPERADMIN:
+            case ROLES.ADMIN:
+                stats = await getSuperAdminStats(user);
+                break;
+
             case ROLES.ADMIN_INSTITUSI:
                 stats = await getAdminInstitusiStats(user);
                 break;
@@ -53,6 +59,76 @@ export const getDashboardStats = async (req, res) => {
 };
 
 // ========== ROLE-SPECIFIC STATS FUNCTIONS ==========
+
+/**
+ * Statistics for Super Admin
+ */
+async function getSuperAdminStats(user) {
+    // User counts by role
+    const allUsers = await User.findAll({ attributes: ['role', 'is_active', 'status', 'created_at'] });
+    const usersByRole = {
+        superadmin: allUsers.filter(u => u.role === 'superadmin').length,
+        admin: allUsers.filter(u => u.role === 'admin').length,
+        dekan: allUsers.filter(u => u.role === 'dekan').length,
+        kaprodi: allUsers.filter(u => u.role === 'kaprodi').length,
+        dosen: allUsers.filter(u => u.role === 'dosen').length,
+        mahasiswa: allUsers.filter(u => u.role === 'mahasiswa').length
+    };
+
+    const totalUsers = allUsers.length;
+    const activeUsers = allUsers.filter(u => u.is_active).length;
+    const pendingApprovals = allUsers.filter(u => u.status === 'pending').length;
+
+    // Recent registrations (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentRegistrations = allUsers.filter(u => new Date(u.created_at) >= sevenDaysAgo).length;
+
+    // Organization counts
+    const fakultasCount = await Fakultas.count({ where: { is_active: true } });
+    const prodiCount = await Prodi.count({ where: { is_active: true } });
+
+    // RPS statistics
+    const allRPS = await RPS.findAll({ attributes: ['status'] });
+    const rpsByStatus = {
+        draft: allRPS.filter(r => r.status === 'draft').length,
+        pending: allRPS.filter(r => r.status === 'pending').length,
+        approved: allRPS.filter(r => r.status === 'approved').length,
+        rejected: allRPS.filter(r => r.status === 'rejected').length
+    };
+    const totalRPS = allRPS.length;
+
+    // Mata Kuliah count
+    const mataKuliahCount = await MataKuliah.count({ where: { is_active: true } });
+
+    // Recent users (last 5)
+    const recentUsers = await User.findAll({
+        order: [['created_at', 'DESC']],
+        limit: 5,
+        attributes: ['id', 'nama_lengkap', 'email', 'role', 'status', 'created_at']
+    });
+
+    return {
+        usersByRole,
+        totalUsers,
+        activeUsers,
+        pendingApprovals,
+        recentRegistrations,
+        fakultasCount,
+        prodiCount,
+        mataKuliahCount,
+        rpsByStatus,
+        totalRPS,
+        recentUsers: recentUsers.map(u => ({
+            id: u.id,
+            nama: u.nama_lengkap,
+            email: u.email,
+            role: u.role,
+            status: u.status,
+            createdAt: u.created_at
+        }))
+    };
+}
 
 /**
  * Statistics for Admin Institusi

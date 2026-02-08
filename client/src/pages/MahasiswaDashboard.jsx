@@ -1,6 +1,8 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import useAuthStore from '../store/useAuthStore';
-import { BookOpen, Calendar, Award, Clock } from 'lucide-react';
+import { BookOpen, Calendar, Award, Clock, User } from 'lucide-react';
+import axios from '../lib/axios';
 
 const StatCard = ({ title, value, icon: Icon, color }) => (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -18,12 +20,31 @@ const StatCard = ({ title, value, icon: Icon, color }) => (
 
 const MahasiswaDashboard = () => {
     const { user } = useAuthStore();
+    const [myCourses, setMyCourses] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchCourses = async () => {
+            try {
+                const res = await axios.get('/mk-aktif/my');
+                setMyCourses(res.data);
+            } catch (error) {
+                console.error('Failed to fetch courses:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCourses();
+    }, []);
+
+    const totalSKS = myCourses.reduce((acc, curr) => acc + (curr.mata_kuliah?.sks || 0), 0);
 
     const stats = [
-        { title: 'Total Mata Kuliah', value: '8', icon: BookOpen, color: 'bg-blue-500' },
-        { title: 'SKS Diambil', value: '24', icon: Award, color: 'bg-green-500' },
-        { title: 'Kehadiran', value: '95%', icon: Clock, color: 'bg-purple-500' },
-        { title: 'Jadwal Hari Ini', value: '2', icon: Calendar, color: 'bg-orange-500' },
+        { title: 'Total Mata Kuliah', value: myCourses.length, icon: BookOpen, color: 'bg-blue-500' },
+        { title: 'SKS Diambil', value: totalSKS, icon: Award, color: 'bg-green-500' },
+        { title: 'Kehadiran', value: '-', icon: Clock, color: 'bg-purple-500' }, // Placeholder
+        { title: 'Semester', value: user?.semester || '-', icon: Calendar, color: 'bg-orange-500' },
     ];
 
     return (
@@ -48,27 +69,44 @@ const MahasiswaDashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                        Jadwal Kuliah Hari Ini
+                        Mata Kuliah Semester Ini
                     </h2>
                     <div className="space-y-4">
-                        <div className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                            <div className="flex-1">
-                                <h3 className="font-medium text-gray-900 dark:text-white">Pemrogaman Web</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">08:00 - 10:30 • Ruang Lab 1</p>
+                        {loading ? (
+                            <p className="text-center text-gray-500 py-4">Memuat data...</p>
+                        ) : myCourses.length > 0 ? (
+                            myCourses.map((mk) => (
+                                <div key={mk.id} className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                    <div className="flex-1">
+                                        <h3 className="font-medium text-gray-900 dark:text-white">
+                                            {mk.mata_kuliah?.nama_mk || 'Unknown Course'}
+                                        </h3>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
+                                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded">
+                                                {mk.mata_kuliah?.kode_mk}
+                                            </span>
+                                            <span>• {mk.mata_kuliah?.sks} SKS</span>
+                                        </p>
+                                    </div>
+                                    {mk.dosen_pengampu && (
+                                        <div className="text-right hidden sm:block">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Dosen Pengampu</p>
+                                            <div className="flex items-center gap-2 justify-end">
+                                                <User className="w-3 h-3 text-gray-400" />
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                                    {mk.dosen_pengampu.nama_lengkap}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-700">
+                                <BookOpen className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                                <p className="text-sm text-gray-500">Belum ada mata kuliah aktif untuk Anda semester ini.</p>
                             </div>
-                            <span className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 rounded-full">
-                                Sedang Berlangsung
-                            </span>
-                        </div>
-                        <div className="flex items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                            <div className="flex-1">
-                                <h3 className="font-medium text-gray-900 dark:text-white">Basis Data</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">13:00 - 15:30 • Ruang 302</p>
-                            </div>
-                            <span className="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 rounded-full">
-                                Akan Datang
-                            </span>
-                        </div>
+                        )}
                     </div>
                 </div>
 
@@ -81,6 +119,13 @@ const MahasiswaDashboard = () => {
                             <h3 className="font-medium text-blue-900 dark:text-blue-300">Pengisian KRS Semester Genap</h3>
                             <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
                                 Pengisian KRS untuk semester genap akan dimulai pada tanggal 20 Februari 2026.
+                            </p>
+                        </div>
+                        {/* Placeholder for now */}
+                        <div className="p-4 border border-green-100 bg-green-50 dark:bg-green-900/10 dark:border-green-800 rounded-lg">
+                            <h3 className="font-medium text-green-900 dark:text-green-300">Jadwal UTS</h3>
+                            <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                                Jadwal Ujian Tengah Semester telah dipublikasikan. Silakan cek di menu Jadwal.
                             </p>
                         </div>
                     </div>

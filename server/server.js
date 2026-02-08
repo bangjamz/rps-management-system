@@ -16,6 +16,11 @@ import analyticsRoutes from './routes/analytics.js';
 import cplAnalyticsRoutes from './routes/cplAnalytics.js';
 import notificationRoutes from './routes/notifications.js';
 import academicYearRoutes from './routes/academicYears.js';
+import globalSettingsRoutes from './routes/globalSettings.js';
+import userManagementRoutes from './routes/userManagement.js';
+import customRolesRoutes from './routes/customRoles.js';
+import profileRoutes from './routes/profile.js';
+import mkAktifRoutes from './routes/mkAktif.js';
 
 // Load environment variables
 dotenv.config();
@@ -63,6 +68,11 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/cpl-analytics', cplAnalyticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/academic-years', academicYearRoutes);
+app.use('/api/settings', globalSettingsRoutes);
+app.use('/api/users', userManagementRoutes);
+app.use('/api/admin/roles', customRolesRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/mk-aktif', mkAktifRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -81,6 +91,13 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+            message: 'File too large. Maximum size is 5MB for settings / 5MB for general uploads.'
+        });
+    }
+
     res.status(500).json({
         message: 'Something went wrong!',
         error: process.env.NODE_ENV === 'development' ? err.message : undefined
@@ -96,8 +113,8 @@ const startServer = async () => {
 
         // Sync models (without force in production)
         if (process.env.NODE_ENV !== 'production') {
-            await sequelize.sync({ alter: true }); // Enabled alter to sync new columns
-            console.log('✅ Database models synchronized');
+            // await sequelize.sync({ alter: false }); // Disabled manually
+            console.log('✅ Database sync skipped for manual migration safety');
         }
 
         app.listen(PORT, () => {

@@ -398,7 +398,7 @@ export default function CurriculumPage() {
             padding: '2em',
             customClass: {
                 popup: 'rounded-xl shadow-xl border border-gray-200 dark:border-gray-700',
-                confirmButton: 'px-6 py-2.5 rounded-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors mx-2',
+                confirmButton: 'px-6 py-2.5 rounded-lg font-semibold text-white bg-primary-600 hover:bg-primary-700 transition-colors mx-2',
                 cancelButton: 'px-6 py-2.5 rounded-lg font-semibold dark:text-gray-200 text-gray-700 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors mx-2'
             },
             buttonsStyling: false,

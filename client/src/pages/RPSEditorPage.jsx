@@ -16,6 +16,8 @@ export default function RPSEditorPage() {
     const [saving, setSaving] = useState(false);
     const [activeSection, setActiveSection] = useState('identitas');
     const [lastSaved, setLastSaved] = useState(null);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false); // State for dropdown
+    const dropdownRef = useRef(null); // Ref for click outside
 
     // Constants for selection
     const teknikPenilaian = [
@@ -23,8 +25,37 @@ export default function RPSEditorPage() {
     ];
 
     const metodePembelajaran = [
-        'Ceramah', 'Diskusi', 'Presentasi', 'Praktikum', 'Problem Based Learning', 'Project Based Learning', 'Inquiry'
+        'Kuliah', 'Diskusi', 'Presentasi', 'Praktikum',
+        'Problem Based Learning (PBL)', 'Project Based Learning (PjBL)',
+        'Case Based Learning (CBL)', 'Inquiry', 'Responsi', 'Seminar'
     ];
+
+    const getMethodColor = (method) => {
+        const colors = {
+            'Kuliah': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
+            'Diskusi': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800',
+            'Presentasi': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800',
+            'Praktikum': 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800',
+            'Problem Based Learning': 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
+            'Problem Based Learning (PBL)': 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
+            'Project Based Learning (PjBL)': 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-800',
+            'Case Based Learning (CBL)': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800',
+            'Inquiry': 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-800',
+            'Responsi': 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-800',
+            'Seminar': 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800'
+        };
+        return colors[method] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600';
+    };
+
+    // Simple Markdown Toolbar Component
+    const SimpleToolbar = ({ onInsert }) => (
+        <div className="flex gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-t-md border-b border-gray-200 dark:border-gray-700">
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); onInsert('**', '**'); }} className="px-2 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs font-bold" title="Bold">B</button>
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); onInsert('*', '*'); }} className="px-2 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs italic" title="Italic">I</button>
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); onInsert('\n- ', ''); }} className="px-2 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs" title="Bullet List">• List</button>
+            <button type="button" onMouseDown={(e) => { e.preventDefault(); onInsert('\n1. ', ''); }} className="px-2 py-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs" title="Numbered List">1. List</button>
+        </div>
+    );
 
     // --- State: Identitas MK ---
     const [courses, setCourses] = useState([]);
@@ -150,7 +181,36 @@ export default function RPSEditorPage() {
         if (!rpsId && activeYear && !formData.mata_kuliah_id) {
             setFormData(prev => ({ ...prev, tahun_ajaran: activeYear }));
         }
-    }, [activeSemester, activeYear, rpsId]);
+    }, [activeCpl, definedSubCPMKs, rows]);
+
+    const handleToolbarInsert = (index, field, prefix, suffix) => {
+        const textarea = document.getElementById(`textarea-${index}-${field}`);
+        if (!textarea) return;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = rows[index][field] || '';
+        const before = text.substring(0, start);
+        const selected = text.substring(start, end);
+        const after = text.substring(end);
+        const newValue = `${before}${prefix}${selected}${suffix}${after}`;
+        updateRow(index, field, newValue);
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(start + prefix.length, end + prefix.length);
+        }, 0);
+    };
+
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [dropdownRef]);
 
     useEffect(() => {
         // Parse courseId from URL query params OR location.state
@@ -347,14 +407,16 @@ export default function RPSEditorPage() {
                     minggu_ke: p.minggu_ke,
                     cpmk_id: p.cpmk_id || '',
                     sub_cpmk_id: p.sub_cpmk_id || '', // Ensure ID is loaded
-                    indikator: p.indikator || '',
+                    indikator: parseArrayField(p.indikator), // Parse to array for dynamic list
                     teknik_penilaian: parseArrayField(p.teknik_penilaian),
                     kriteria_penilaian: p.kriteria_penilaian || '',
                     materi: p.materi || '',
                     metode_pembelajaran: parseArrayField(p.metode_pembelajaran),
-                    bentuk_pembelajaran: parseArrayField(p.bentuk_pembelajaran),
+                    bentuk_pembelajaran: Array.isArray(p.bentuk_pembelajaran) ? p.bentuk_pembelajaran : [],
                     link_daring: p.link_daring || '',
-                    bobot_penilaian: p.bobot_penilaian || 0,
+                    nama_lms: p.nama_lms || '',
+                    link_meet_platform: p.link_meet_platform || '',
+                    penugasan: p.penugasan || '', // Add Penugasan Field
                     bobot_penilaian: p.bobot_penilaian || 0,
                     is_uts: p.is_uts || p.jenis_pertemuan === 'uts',
                     is_uas: p.is_uas || p.jenis_pertemuan === 'uas'
@@ -378,16 +440,20 @@ export default function RPSEditorPage() {
             minggu_ke: i + 1,
             cpmk_id: '',
             sub_cpmk_id: '',
-            indikator: '',
+            indikator: [''],
             teknik_penilaian: [],
             kriteria_penilaian: '',
             materi: i + 1 === utsWeek ? 'Ujian Tengah Semester' : i + 1 === uasWeek ? 'Ujian Akhir Semester' : '',
             metode_pembelajaran: [],
             bentuk_pembelajaran: [],
             link_daring: '',
+            nama_lms: '',
+            link_meet_platform: '',
+            penugasan: '', // Add Penugasan Field
             bobot_penilaian: i + 1 === utsWeek ? 22 : i + 1 === uasWeek ? 26 : '',
             is_uts: i + 1 === utsWeek,
-            is_uas: i + 1 === uasWeek
+            is_uas: i + 1 === uasWeek,
+            sampai_minggu_ke: null
         }));
         setRows(newRows);
     };
@@ -529,9 +595,11 @@ export default function RPSEditorPage() {
                     teknik_penilaian: [],
                     materi: sub.deskripsi, // Default materi from description
                     metode_pembelajaran: [],
-                    bentuk_pembelajaran: [],
+                    bentuk_pembelajaran: sub.estimasi_minggu && sub.estimasi_minggu > 0 ? 'Kuliah' : '',
                     bobot_penilaian: 5,
                     link_daring: '',
+                    nama_lms: '',
+                    link_meet_platform: '',
                     is_uts: false,
                     is_uas: false
                 });
@@ -673,6 +741,8 @@ export default function RPSEditorPage() {
                         metode_pembelajaran: [],
                         bentuk_pembelajaran: [],
                         link_daring: '',
+                        nama_lms: '',
+                        link_meet_platform: '',
                         bobot_penilaian: '',
                         is_uts: false,
                         is_uas: false
@@ -705,6 +775,11 @@ export default function RPSEditorPage() {
 
 
     const handleAddUTS = () => {
+        if (rows.some(r => r.is_uts)) {
+            alert('UTS sudah ada dalam rencana mingguan.');
+            return;
+        }
+
         const newRow = {
             id: 'uts_' + Date.now(),
             minggu_ke: 8,
@@ -717,6 +792,8 @@ export default function RPSEditorPage() {
             bentuk_pembelajaran: [],
             bobot_penilaian: 20, // default bobot
             link_daring: '',
+            nama_lms: '',
+            link_meet_platform: '',
             is_uts: true,
             is_uas: false
         };
@@ -740,6 +817,11 @@ export default function RPSEditorPage() {
     };
 
     const handleAddUAS = () => {
+        if (rows.some(r => r.is_uas)) {
+            alert('UAS sudah ada dalam rencana mingguan.');
+            return;
+        }
+
         const newRow = {
             id: 'uas_' + Date.now(),
             minggu_ke: 16,
@@ -752,17 +834,28 @@ export default function RPSEditorPage() {
             bentuk_pembelajaran: [],
             bobot_penilaian: 20, // default bobot
             link_daring: '',
+            nama_lms: '',
+            link_meet_platform: '',
             is_uts: false,
             is_uas: true
         };
         const newRows = [...rows];
         newRows.push(newRow);
+        // Sort
+        newRows.sort((a, b) => (parseInt(a.minggu_ke) || 999) - (parseInt(b.minggu_ke) || 999));
         setRows(newRows);
     };
 
     const addWeek = () => {
-        const newMinggu = rows.length + 1;
-        setRows([...rows, {
+        // Find highest week number
+        let maxWeek = 0;
+        rows.forEach(r => {
+            const w = parseInt(r.minggu_ke) || 0;
+            if (w > maxWeek) maxWeek = w;
+        });
+        const newMinggu = maxWeek + 1;
+
+        const newRows = [...rows, {
             id: Date.now(),
             minggu_ke: newMinggu,
             cpmk_id: '',
@@ -774,23 +867,27 @@ export default function RPSEditorPage() {
             metode_pembelajaran: [],
             bentuk_pembelajaran: [],
             link_daring: '',
+            nama_lms: '',
+            link_meet_platform: '',
             bobot_penilaian: '',
             is_uts: false,
-            is_uas: false
-        }]);
+            is_uas: false,
+            sampai_minggu_ke: null
+        }];
+
+        // Optional: Sort by minggu_ke to keep UI tidy
+        newRows.sort((a, b) => (parseInt(a.minggu_ke) || 999) - (parseInt(b.minggu_ke) || 999));
+
+        setRows(newRows);
     };
 
     const removeWeek = (index) => {
-        if (rows.length <= 10) {
-            alert('Minimal 10 pertemuan');
+        if (rows.length <= 1) {
+            alert('Minimal 1 pertemuan');
             return;
         }
-        const row = rows[index];
-        if (row.is_uts || row.is_uas) {
-            alert('Tidak bisa menghapus minggu UTS/UAS');
-            return;
-        }
-        const newRows = rows.filter((_, i) => i !== index).map((r, i) => ({ ...r, minggu_ke: i + 1 }));
+        // Fix: Just remove the row, DO NOT renumber (it messes up UTS/UAS positions)
+        const newRows = rows.filter((_, i) => i !== index);
         setRows(newRows);
     };
 
@@ -875,7 +972,7 @@ export default function RPSEditorPage() {
 
             // If editing existing RPS, update instead of create
             if (currentRPSId) {
-                await axios.put(`/rps/dosen/${currentRPSId}/update`, {
+                const res = await axios.put(`/rps/dosen/${currentRPSId}/update`, {
                     ...formData,
                     cpl_ids: selectedCPLs,
                     cpmk_ids: selectedCPMKs,
@@ -883,6 +980,11 @@ export default function RPSEditorPage() {
                     metode_penilaian: metodePenilaian,
                     dosen_pengampu_list
                 });
+
+                // Update local status in case it was reverted to draft
+                if (res.data && res.data.status) {
+                    setFormData(prev => ({ ...prev, status: res.data.status }));
+                }
             } else {
                 // Create new RPS
                 const res = await axios.post('/rps/dosen/create', {
@@ -925,7 +1027,41 @@ export default function RPSEditorPage() {
             }
 
             if (rows.length > 0 && saveId) {
-                await axios.post(`/rps/dosen/${saveId}/pertemuan/bulk`, { pertemuan: rows });
+                // Prepare rows for saving (stringify arrays that need to be text)
+                const rowsToSend = rows.map(r => {
+                    let indikatorVal = r.indikator;
+                    // Strict check: if it's an array or object, stringify it. 
+                    // If it's already a string, leave it (unless it needs cleaning, but backend expects string)
+                    if (Array.isArray(indikatorVal) || (typeof indikatorVal === 'object' && indikatorVal !== null)) {
+                        indikatorVal = JSON.stringify(indikatorVal);
+                    } else if (indikatorVal === undefined || indikatorVal === null) {
+                        indikatorVal = ''; // Handled as empty text
+                    } else {
+                        indikatorVal = String(indikatorVal); // Force string
+                    }
+
+                    return {
+                        ...r,
+                        indikator: indikatorVal,
+                        // Clean and stringify metode_pembelajaran
+                        metode_pembelajaran: Array.isArray(r.metode_pembelajaran)
+                            ? JSON.stringify(r.metode_pembelajaran.filter(x => x && x.trim() !== ''))
+                            : r.metode_pembelajaran,
+                        // Clean and stringify bentuk_pembelajaran (if it's an array, though mostly string now)
+                        bentuk_pembelajaran: Array.isArray(r.bentuk_pembelajaran)
+                            ? JSON.stringify(r.bentuk_pembelajaran.filter(x => x && x.trim() !== ''))
+                            : r.bentuk_pembelajaran,
+                        // Clean sub_cpmk_id
+                        sub_cpmk_id: r.sub_cpmk_id || null,
+                        // Ensure link_daring and nama_lms are saved
+                        link_daring: r.link_daring || '',
+                        nama_lms: r.nama_lms || '',
+                        link_meet_platform: r.link_meet_platform || '',
+                        // Add penugasan
+                        penugasan: r.penugasan || ''
+                    };
+                });
+                await axios.post(`/rps/dosen/${saveId}/pertemuan/bulk`, { pertemuan: rowsToSend });
             }
 
             // Clear draft
@@ -1421,7 +1557,7 @@ export default function RPSEditorPage() {
                             {/* Sub-CPMK List with Reordering */}
                             <div className="space-y-3 mb-8">
                                 {definedSubCPMKs.map((sub, idx) => (
-                                    <div key={sub.id || idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 group hover:border-blue-300 transition-colors">
+                                    <div key={sub.id || idx} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-200 dark:border-gray-600 group hover:border-blue-300 dark:hover:border-blue-500 transition-colors">
                                         <div className="flex flex-col gap-1 mt-1">
                                             <button
                                                 onClick={() => moveSubCPMK(idx, 'up')}
@@ -1447,7 +1583,7 @@ export default function RPSEditorPage() {
                                                     type="text"
                                                     value={sub.kode}
                                                     onChange={(e) => updateSubCPMK(sub.id, 'kode', e.target.value)}
-                                                    className="input input-sm input-bordered w-full font-mono font-bold text-purple-700"
+                                                    className="input input-sm input-bordered w-full font-mono font-bold text-purple-700 dark:text-purple-300 dark:bg-gray-800"
                                                 />
                                             </div>
                                             <div className="col-span-8">
@@ -1455,7 +1591,7 @@ export default function RPSEditorPage() {
                                                 <textarea
                                                     value={sub.deskripsi}
                                                     onChange={(e) => updateSubCPMK(sub.id, 'deskripsi', e.target.value)}
-                                                    className="textarea textarea-sm textarea-bordered w-full leading-tight min-h-[3rem]"
+                                                    className="textarea textarea-sm textarea-bordered w-full leading-tight min-h-[3rem] dark:bg-gray-800 dark:text-gray-200"
                                                     rows={2}
                                                 />
                                             </div>
@@ -1468,7 +1604,7 @@ export default function RPSEditorPage() {
                                                         max="16"
                                                         value={sub.estimasi_minggu || 1}
                                                         onChange={(e) => updateSubCPMK(sub.id, 'estimasi_minggu', e.target.value)}
-                                                        className="input input-sm input-bordered w-full text-center font-bold bg-yellow-50 border-yellow-200"
+                                                        className="input input-sm input-bordered w-full text-center font-bold bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-200"
                                                     />
                                                     <span className="text-xs text-gray-400">Ptm</span>
                                                 </div>
@@ -1685,7 +1821,7 @@ export default function RPSEditorPage() {
                                                         newMetodes[idx].type = e.target.value;
                                                         setMetodePenilaian(newMetodes);
                                                     }}
-                                                    className="select select-sm w-full border-gray-300"
+                                                    className="select select-sm w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                                                 >
                                                     {assessmentTypes.map(t => <option key={t} value={t}>{t}</option>)}
                                                 </select>
@@ -1700,7 +1836,7 @@ export default function RPSEditorPage() {
                                                         newMetodes[idx].name = e.target.value;
                                                         setMetodePenilaian(newMetodes);
                                                     }}
-                                                    className="input input-sm w-full border-gray-300"
+                                                    className="input input-sm w-full border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
                                                     placeholder={`Contoh: ${metode.type} 1`}
                                                 />
                                             </div>
@@ -1738,9 +1874,9 @@ export default function RPSEditorPage() {
 
                                                 <div className="overflow-x-auto border rounded">
                                                     <table className="table table-xs w-full">
-                                                        <thead className="bg-gray-50">
+                                                        <thead className="bg-gray-50 dark:bg-gray-700">
                                                             <tr>
-                                                                <th className="w-1/4">Kriteria \ Skala</th>
+                                                                <th className="w-1/4 text-gray-700 dark:text-gray-300">Kriteria \ Skala</th>
                                                                 {(metode.scales || []).map((scale, sIdx) => (
                                                                     <th key={sIdx} className="text-center min-w-[100px]">
                                                                         <input
@@ -1889,16 +2025,39 @@ export default function RPSEditorPage() {
                                         {totalBobot !== 100 && <span className="text-red-500"> (Harus 100%)</span>}
                                     </p>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={handleAddUTS} className="btn btn-warning btn-sm text-white">
-                                        <Plus size={16} className="mr-1" /> Tambah UTS
+                                <div className="relative" ref={dropdownRef}>
+                                    <button
+                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                        className="btn btn-primary btn-sm flex items-center gap-1"
+                                    >
+                                        <Plus size={16} /> Tambah <ChevronDown size={14} />
                                     </button>
-                                    <button onClick={handleAddUAS} className="btn btn-warning btn-sm text-white">
-                                        <Plus size={16} className="mr-1" /> Tambah UAS
-                                    </button>
-                                    <button onClick={addWeek} className="btn btn-primary btn-sm">
-                                        <Plus size={16} className="mr-1" /> Tambah Minggu
-                                    </button>
+
+                                    {isDropdownOpen && (
+                                        <div className="absolute right-0 z-[10] mt-1 w-40 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none border border-gray-200 dark:border-gray-700">
+                                            <div className="py-1">
+                                                <button
+                                                    onClick={() => { addWeek(); setIsDropdownOpen(false); }}
+                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-blue-200 dark:hover:bg-blue-900 hover:text-blue-900"
+                                                >
+                                                    Pertemuan
+                                                </button>
+                                                <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+                                                <button
+                                                    onClick={() => { handleAddUTS(); setIsDropdownOpen(false); }}
+                                                    className="block w-full text-left px-4 py-2 text-sm text-yellow-700 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900 font-medium"
+                                                >
+                                                    UTS
+                                                </button>
+                                                <button
+                                                    onClick={() => { handleAddUAS(); setIsDropdownOpen(false); }}
+                                                    className="block w-full text-left px-4 py-2 text-sm text-yellow-700 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900 font-medium"
+                                                >
+                                                    UAS
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -1933,7 +2092,7 @@ export default function RPSEditorPage() {
                                                         type="text"
                                                         value={row.minggu_ke}
                                                         readOnly
-                                                        className="input input-sm input-bordered w-full text-center font-bold bg-white"
+                                                        className="input input-sm input-bordered w-full text-center font-bold bg-white dark:bg-gray-800 dark:text-yellow-200 dark:border-yellow-700"
                                                     />
                                                 </div>
 
@@ -1947,7 +2106,7 @@ export default function RPSEditorPage() {
                                                         type="number"
                                                         value={row.bobot_penilaian}
                                                         onChange={e => updateRow(index, 'bobot_penilaian', e.target.value)}
-                                                        className="input input-sm input-bordered w-full text-center font-bold bg-white"
+                                                        className="input input-sm input-bordered w-full text-center font-bold bg-white dark:bg-gray-800 dark:text-yellow-200 dark:border-yellow-700"
                                                     />
                                                 </div>
                                             </div>
@@ -1956,7 +2115,9 @@ export default function RPSEditorPage() {
 
                                     // Regular Meeting Card
                                     return (
-                                        <div key={row.id} className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm p-4 relative hover:border-blue-300 transition-colors">
+                                        <div key={row.id || index} className={`border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm p-6 relative hover:border-blue-300 dark:hover:border-blue-500 transition-colors ${row.is_uts ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700' :
+                                            row.is_uas ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700' : ''
+                                            }`}>
                                             <button onClick={() => removeWeek(index)} className="absolute top-2 right-2 btn btn-ghost btn-xs text-red-500 opacity-50 hover:opacity-100">
                                                 <Trash2 size={16} />
                                             </button>
@@ -1994,7 +2155,7 @@ export default function RPSEditorPage() {
                                                                 }
                                                             }
                                                         }}
-                                                        className="input input-sm input-bordered w-full text-center font-bold"
+                                                        className="input input-sm input-bordered w-full text-center font-bold dark:bg-gray-700 dark:text-white"
                                                     />
                                                 </div>
 
@@ -2022,13 +2183,23 @@ export default function RPSEditorPage() {
                                                             newRows[index] = newRow;
                                                             setRows(newRows);
                                                         }}
-                                                        className="select select-sm select-bordered w-full text-xs font-medium"
+                                                        className="select select-sm select-bordered w-full text-xs font-medium mb-1 dark:bg-gray-700 dark:text-white"
                                                     >
                                                         <option value="">- Pilih Sub-CPMK -</option>
                                                         {definedSubCPMKs.map(sub => (
-                                                            <option key={sub.id} value={sub.id}>{sub.kode} - {sub.deskripsi}</option>
+                                                            <option key={sub.id} value={sub.id}>{sub.kode}</option>
                                                         ))}
                                                     </select>
+
+                                                    {/* Description Display */}
+                                                    {row.sub_cpmk_id && (() => {
+                                                        const selectedSub = definedSubCPMKs.find(s => String(s.id) === String(row.sub_cpmk_id));
+                                                        return selectedSub ? (
+                                                            <div className="text-[10px] text-gray-600 bg-gray-50 dark:bg-gray-700/50 dark:text-gray-400 p-1.5 rounded border border-gray-100 dark:border-gray-600 italic leading-tight">
+                                                                {selectedSub.deskripsi}
+                                                            </div>
+                                                        ) : null;
+                                                    })()}
                                                 </div>
 
                                                 <div className="w-20 text-center">
@@ -2037,7 +2208,7 @@ export default function RPSEditorPage() {
                                                         type="number"
                                                         value={row.bobot_penilaian}
                                                         onChange={e => updateRow(index, 'bobot_penilaian', e.target.value)}
-                                                        className={`input input-sm input-bordered w-full text-center font-bold ${!row.bobot_penilaian ? 'bg-red-50 border-red-200' : ''}`}
+                                                        className={`input input-sm input-bordered w-full text-center font-bold dark:bg-gray-700 dark:text-white ${!row.bobot_penilaian ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : ''}`}
                                                     />
                                                 </div>
                                             </div>
@@ -2049,35 +2220,82 @@ export default function RPSEditorPage() {
                                                     <label className="label py-1">
                                                         <span className="label-text text-xs font-bold text-gray-500 uppercase">Indikator Penilaian</span>
                                                     </label>
-                                                    <textarea
-                                                        value={row.indikator}
-                                                        onChange={e => updateRow(index, 'indikator', e.target.value)}
-                                                        className="textarea textarea-bordered w-full h-24 text-sm leading-relaxed"
-                                                        placeholder="Deskripsikan indikator..."
-                                                    />
+                                                    <div className="space-y-2">
+                                                        {(Array.isArray(row.indikator) ? row.indikator : (row.indikator ? [row.indikator] : [''])).map((ind, iInd) => (
+                                                            <div key={iInd} className="flex gap-2">
+                                                                <span className="py-2 text-sm text-gray-400 font-mono select-none">{iInd + 1}.</span>
+                                                                <input
+                                                                    type="text"
+                                                                    value={ind}
+                                                                    onChange={(e) => {
+                                                                        const current = Array.isArray(row.indikator) ? [...row.indikator] : (row.indikator ? [row.indikator] : ['']);
+                                                                        current[iInd] = e.target.value;
+                                                                        updateRow(index, 'indikator', current);
+                                                                    }}
+                                                                    className="input input-sm input-bordered w-full dark:bg-gray-700 dark:text-white"
+                                                                    placeholder={`Indikator ${iInd + 1}...`}
+                                                                />
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const current = Array.isArray(row.indikator) ? [...row.indikator] : (row.indikator ? [row.indikator] : ['']);
+                                                                        current.splice(iInd, 1);
+                                                                        updateRow(index, 'indikator', current);
+                                                                    }}
+                                                                    disabled={iInd === 0 && (Array.isArray(row.indikator) ? row.indikator.length === 1 : true)}
+                                                                    className="btn btn-sm btn-ghost text-red-400 px-2"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        <button
+                                                            onClick={() => {
+                                                                const current = Array.isArray(row.indikator) ? [...row.indikator] : (row.indikator ? [row.indikator] : ['']);
+                                                                updateRow(index, 'indikator', [...current, '']);
+                                                            }}
+                                                            className="btn btn-xs btn-outline border-dashed w-full text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-400"
+                                                        >
+                                                            <Plus size={12} className="mr-1" /> Tambah Indikator
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 {/* Kriteria & Teknik */}
-                                                <div className="form-control">
-                                                    <label className="label py-1 flex justify-between">
-                                                        <span className="label-text text-xs font-bold text-gray-500 uppercase">Kriteria & Teknik</span>
-                                                    </label>
-                                                    <textarea
-                                                        value={row.kriteria_penilaian}
-                                                        onChange={e => updateRow(index, 'kriteria_penilaian', e.target.value)}
-                                                        className="textarea textarea-bordered w-full h-24 text-sm leading-relaxed mb-2"
-                                                        placeholder="Deskripsikan kriteria..."
-                                                    />
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {teknikPenilaian.slice(0, 4).map(t => (
-                                                            <label key={t} className={`text-[10px] px-2 py-1 rounded-full cursor-pointer border transition-all ${(row.teknik_penilaian || []).includes(t)
-                                                                ? 'bg-blue-100 border-blue-300 text-blue-700 font-semibold'
-                                                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                                                                }`}>
-                                                                <input type="checkbox" checked={(row.teknik_penilaian || []).includes(t)} onChange={() => toggleMultiSelect(index, 'teknik_penilaian', t, 3)} className="hidden" />
-                                                                {t}
-                                                            </label>
-                                                        ))}
+                                                {/* Kriteria & Teknik Separate Boxes */}
+                                                <div className="form-control space-y-3">
+                                                    {/* Kriteria Box */}
+                                                    <div>
+                                                        <label className="label py-1">
+                                                            <span className="label-text text-xs font-bold text-gray-500 uppercase">Kriteria Penilaian</span>
+                                                        </label>
+                                                        <div className="border border-gray-300 dark:border-gray-600 rounded-md focus-within:ring-1 focus-within:ring-blue-500 bg-white dark:bg-gray-900">
+                                                            <SimpleToolbar onInsert={(pre, suf) => handleToolbarInsert(index, 'kriteria_penilaian', pre, suf)} />
+                                                            <textarea
+                                                                id={`textarea-${index}-kriteria_penilaian`}
+                                                                value={row.kriteria_penilaian}
+                                                                onChange={e => updateRow(index, 'kriteria_penilaian', e.target.value)}
+                                                                className="textarea w-full h-24 text-sm leading-relaxed focus:outline-none border-none bg-transparent font-mono p-3 dark:text-gray-200"
+                                                                placeholder="Deskripsikan kriteria..."
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Teknik Box */}
+                                                    <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                                        <label className="label py-1 pt-0">
+                                                            <span className="label-text text-xs font-bold text-gray-500 uppercase">Teknik Penilaian</span>
+                                                        </label>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {teknikPenilaian.slice(0, 4).map(t => (
+                                                                <label key={t} className={`text-[10px] px-2 py-1 rounded-full cursor-pointer border transition-all select-none ${(row.teknik_penilaian || []).includes(t)
+                                                                    ? 'bg-blue-100 border-blue-300 text-blue-700 font-semibold dark:bg-blue-900/50 dark:border-blue-700 dark:text-blue-300'
+                                                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-100 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-600'
+                                                                    }`}>
+                                                                    <input type="checkbox" checked={(row.teknik_penilaian || []).includes(t)} onChange={() => toggleMultiSelect(index, 'teknik_penilaian', t, 3)} className="hidden" />
+                                                                    {t}
+                                                                </label>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -2086,53 +2304,101 @@ export default function RPSEditorPage() {
                                                     <label className="label py-1">
                                                         <span className="label-text text-xs font-bold text-gray-500 uppercase">Materi Pembelajaran</span>
                                                     </label>
-                                                    <textarea
-                                                        value={row.materi}
-                                                        onChange={e => updateRow(index, 'materi', e.target.value)}
-                                                        className="textarea textarea-bordered w-full h-24 text-sm leading-relaxed"
-                                                        placeholder="Isi materi..."
-                                                    />
+                                                    <div className="border border-gray-300 dark:border-gray-600 rounded-md focus-within:ring-1 focus-within:ring-blue-500 bg-white dark:bg-gray-900">
+                                                        <SimpleToolbar onInsert={(pre, suf) => handleToolbarInsert(index, 'materi', pre, suf)} />
+                                                        <textarea
+                                                            id={`textarea-${index}-materi`}
+                                                            value={row.materi}
+                                                            onChange={e => updateRow(index, 'materi', e.target.value)}
+                                                            className="textarea w-full h-28 text-sm leading-relaxed focus:outline-none border-none bg-transparent font-mono p-3 dark:text-gray-200"
+                                                            placeholder="Isi materi..."
+                                                        />
+                                                    </div>
                                                 </div>
 
                                                 {/* Metode & Bentuk */}
-                                                <div className="form-control">
-                                                    <label className="label py-1 flex justify-between">
-                                                        <span className="label-text text-xs font-bold text-gray-500 uppercase">Metode & Bentuk Pembelajaran</span>
-                                                        <span className="text-[10px] text-gray-400">Pilih maks 5 metode</span>
+                                                {/* Metode & Bentuk Restructured */}
+                                                <div className="form-control border rounded-lg p-3 space-y-4 bg-gray-50/50 dark:bg-gray-800/30 dark:border-gray-700">
+                                                    <label className="label py-0 pb-2 border-b border-gray-200 dark:border-gray-700 mb-2">
+                                                        <span className="label-text text-sm font-bold text-gray-800 uppercase">Bentuk Pembelajaran</span>
                                                     </label>
 
-                                                    <div className="flex flex-wrap gap-1 mb-2">
-                                                        {metodePembelajaran.slice(0, 5).map(m => (
-                                                            <label key={m} className={`text-[10px] px-2 py-1 rounded-full cursor-pointer border transition-all ${(row.metode_pembelajaran || []).includes(m)
-                                                                ? 'bg-purple-100 border-purple-300 text-purple-700 font-semibold'
-                                                                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
-                                                                }`}>
-                                                                <input type="checkbox" checked={(row.metode_pembelajaran || []).includes(m)} onChange={() => toggleMultiSelect(index, 'metode_pembelajaran', m, 5)} className="hidden" />
-                                                                {m}
-                                                            </label>
-                                                        ))}
+                                                    {/* A. Luring */}
+                                                    <div>
+                                                        <div className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                                                            <Users size={12} /> A. Tatap Muka / Luring
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 mb-2 p-2 bg-white dark:bg-gray-900 rounded border border-gray-100 dark:border-gray-700">
+                                                            {metodePembelajaran.map(m => (
+                                                                <label key={m} className={`text-[11px] px-3 py-1.5 rounded-full cursor-pointer border transition-all select-none ${(row.metode_pembelajaran || []).includes(m)
+                                                                    ? `${getMethodColor(m)} font-bold shadow-sm ring-1 ring-inset ring-black/5 dark:ring-white/10`
+                                                                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700'
+                                                                    }`}>
+                                                                    <input type="checkbox" checked={(row.metode_pembelajaran || []).includes(m)} onChange={() => toggleMultiSelect(index, 'metode_pembelajaran', m, 10)} className="hidden" />
+                                                                    {m}
+                                                                    {(row.metode_pembelajaran || []).includes(m) && <CheckCircle size={10} className="inline ml-1" />}
+                                                                </label>
+                                                            ))}
+                                                        </div>
                                                     </div>
 
-                                                    <div className="flex gap-2">
-                                                        <div className="join w-full">
-                                                            <button
-                                                                className={`join-item btn btn-sm flex-1 ${!(row.link_daring) ? 'btn-active btn-neutral' : 'btn-outline'}`}
-                                                                onClick={() => updateRow(index, 'link_daring', '')}
-                                                            >Luring</button>
-                                                            <button
-                                                                className={`join-item btn btn-sm flex-1 ${(row.link_daring) ? 'btn-active btn-primary' : 'btn-outline'}`}
-                                                                onClick={() => updateRow(index, 'link_daring', 'https://meet.google.com')} // Placeholder
-                                                            >Daring</button>
+                                                    {/* B. Daring */}
+                                                    <div>
+                                                        <div className="text-xs font-bold text-blue-600 uppercase mb-2 flex items-center gap-1">
+                                                            <Cloud size={12} /> B. Daring / Online
                                                         </div>
-                                                        <div className="join">
-                                                            <button
-                                                                className={`join-item btn btn-sm ${row.bentuk_pembelajaran?.includes('Kuliah') ? 'btn-active' : 'btn-outline'}`}
-                                                                onClick={() => toggleBentukPembelajaran(index, 'Kuliah')}
-                                                            >K</button>
-                                                            <button
-                                                                className={`join-item btn btn-sm ${row.bentuk_pembelajaran?.includes('Diskusi') ? 'btn-active' : 'btn-outline'}`}
-                                                                onClick={() => toggleBentukPembelajaran(index, 'Diskusi')}
-                                                            >D</button>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded border border-blue-100 dark:border-blue-800">
+                                                            <div className="form-control">
+                                                                <label className="label-text text-[10px] uppercase font-bold text-gray-500 mb-1">Nama LMS <span className="text-red-500">*</span></label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.nama_lms || ''}
+                                                                    onChange={e => updateRow(index, 'nama_lms', e.target.value)}
+                                                                    className="input input-sm input-bordered w-full bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                                                    placeholder="Ex: sibeda.mahardika.ac.id"
+                                                                />
+                                                            </div>
+                                                            <div className="form-control">
+                                                                <label className="label-text text-[10px] uppercase font-bold text-gray-500 mb-1">Platform Meeting</label>
+                                                                <select
+                                                                    value={row.link_meet_platform || ''}
+                                                                    onChange={e => updateRow(index, 'link_meet_platform', e.target.value)}
+                                                                    className="select select-sm select-bordered w-full bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                                                >
+                                                                    <option value="">Pilih Platform...</option>
+                                                                    <option value="Google Meet">Google Meet</option>
+                                                                    <option value="Zoom">Zoom</option>
+                                                                    <option value="Manual Input">Manual Input</option>
+                                                                </select>
+                                                            </div>
+                                                            <div className="form-control">
+                                                                <label className="label-text text-[10px] uppercase font-bold text-gray-500 mb-1">Link Meeting URL</label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.link_daring || ''}
+                                                                    onChange={e => updateRow(index, 'link_daring', e.target.value)}
+                                                                    className="input input-sm input-bordered w-full bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                                                    placeholder="Ex: https://zoom.us/..."
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* C. Penugasan */}
+                                                    <div>
+                                                        <div className="text-xs font-bold text-green-600 uppercase mb-2 flex items-center gap-1">
+                                                            <CheckCircle size={12} /> C. Penugasan
+                                                        </div>
+                                                        <div className="p-3 bg-green-50/50 dark:bg-green-900/10 rounded border border-green-100 dark:border-green-800">
+                                                            <div className="form-control">
+                                                                <label className="label-text text-[10px] uppercase font-bold text-gray-500 mb-1">Deskripsi Tugas</label>
+                                                                <textarea
+                                                                    value={row.penugasan || ''}
+                                                                    onChange={e => updateRow(index, 'penugasan', e.target.value)}
+                                                                    className="textarea textarea-sm textarea-bordered w-full bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-white min-h-[60px] leading-tight"
+                                                                    placeholder="Deskripsi tugas, latihan, atau kegiatan mandiri..."
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
