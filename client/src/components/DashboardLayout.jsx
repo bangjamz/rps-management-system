@@ -225,8 +225,15 @@ export default function DashboardLayout({ children }) {
 
     const appName = settings?.nama_pt || 'Institut Teknologi dan Kesehatan Mahardika';
     const appLogo = settings?.logo_path
-        ? `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${settings.logo_path}`
-        : '/logo-mahardika.jpg';
+        ? `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${settings.logo_path}?t=${new Date().getTime()}`
+        : null;
+
+    const initials = appName
+        ?.split(' ')
+        .map(n => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || '??';
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex font-sans">
@@ -234,12 +241,20 @@ export default function DashboardLayout({ children }) {
             <div className={`fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-30 flex flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
                 {/* Logo */}
                 <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100 dark:border-gray-800 shrink-0">
-                    <img
-                        src={appLogo}
-                        alt={appName}
-                        className="w-10 h-10 rounded-lg object-cover shadow-sm"
-                        onError={(e) => { e.target.src = '/logo-mahardika.jpg'; }}
-                    />
+                    <div className="bg-white dark:bg-gray-800 rounded-lg w-10 h-10 flex items-center justify-center overflow-hidden border dark:border-gray-700 shadow-sm shrink-0">
+                        <img
+                            src={appLogo}
+                            alt={appName}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                            }}
+                        />
+                        <div style={{ display: 'none' }} className="w-full h-full bg-primary-600 flex items-center justify-center text-white font-bold text-xs uppercase tracking-tighter">
+                            {initials}
+                        </div>
+                    </div>
                     <div>
                         <h1 className="font-bold text-gray-900 dark:text-white text-lg tracking-tight">SAMPIRANS</h1>
                         <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium line-clamp-2 max-w-[150px] leading-tight">

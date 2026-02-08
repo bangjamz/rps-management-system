@@ -20,7 +20,22 @@ const THEME_PRESETS = [
     { name: 'Modern Forest', primary: '#166534', secondary: '#2d2d2d', accent: '#fbbf24' },
 ];
 
-const LogoUploader = ({ label, currentImage, onFileSelect, onDelete }) => {
+const InitialsAvatar = ({ name, className = "w-full h-full" }) => {
+    const initials = name
+        ?.split(' ')
+        .map(n => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || '??';
+
+    return (
+        <div className={`${className} bg-primary-600 flex items-center justify-center text-white font-bold`}>
+            <span className="text-[35%] tracking-tighter">{initials}</span>
+        </div>
+    );
+};
+
+const LogoUploader = ({ label, currentImage, onFileSelect, onDelete, className = "aspect-square max-w-[140px]", description }) => {
     const [preview, setPreview] = useState(null);
 
     const handleFileChange = (e) => {
@@ -33,38 +48,58 @@ const LogoUploader = ({ label, currentImage, onFileSelect, onDelete }) => {
         }
     };
 
+    const clearPreview = () => {
+        setPreview(null);
+        onDelete();
+    };
+
+    const displayImage = preview || (currentImage?.startsWith('http') ? currentImage : (currentImage ? `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${currentImage}?t=${new Date().getTime()}` : null));
+
     return (
-        <div className="space-y-3">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</label>
-            <div className="relative group aspect-square rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex flex-col items-center justify-center overflow-hidden transition-all hover:border-primary-500/50">
-                {preview || currentImage ? (
-                    <>
+        <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">{label}</label>
+            <div className={`relative group rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-950/30 flex items-center justify-center overflow-hidden transition-all hover:border-primary-500/50 hover:bg-white dark:hover:bg-gray-900 ${className}`}>
+                {displayImage ? (
+                    <div className="w-full h-full p-2 flex items-center justify-center">
                         <img
-                            src={preview || (currentImage?.startsWith('http') ? currentImage : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${currentImage}`)}
+                            src={displayImage}
                             alt={label}
-                            className="w-full h-full object-contain p-4"
+                            className="max-w-full max-h-full object-contain"
+                            onError={(e) => {
+                                // If image fails, revert to upload state
+                                e.target.style.display = 'none';
+                                e.target.parentElement.classList.add('broken-image');
+                            }}
                         />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <label className="p-2 bg-white rounded-full text-gray-900 cursor-pointer hover:scale-110 transition-transform">
-                                <FaUpload />
+
+                        {/* Overlay on Hover */}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px]">
+                            <label className="p-2.5 bg-white dark:bg-gray-800 rounded-full text-primary-600 dark:text-primary-400 cursor-pointer hover:scale-110 transition-transform shadow-lg border border-gray-100 dark:border-gray-700">
+                                <FaUpload size={14} />
                                 <input type="file" className="hidden" onChange={handleFileChange} />
                             </label>
                             <button
-                                onClick={() => { setPreview(null); onDelete(); }}
-                                className="p-2 bg-red-500 rounded-full text-white hover:scale-110 transition-transform"
+                                type="button"
+                                onClick={clearPreview}
+                                className="p-2.5 bg-red-600 rounded-full text-white hover:scale-110 transition-transform shadow-lg"
                             >
-                                <FaTrash />
+                                <FaTrash size={12} />
                             </button>
                         </div>
-                    </>
+                    </div>
                 ) : (
-                    <label className="flex flex-col items-center cursor-pointer text-gray-400 hover:text-primary-500 transition-colors">
-                        <Upload className="w-8 h-8 mb-2" />
-                        <span className="text-xs font-medium">Upload File</span>
+                    <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer text-gray-400 hover:text-primary-500 transition-colors">
+                        <Upload className="w-6 h-6 mb-1.5" />
+                        <span className="text-[10px] font-bold uppercase tracking-tight">Upload</span>
                         <input type="file" className="hidden" onChange={handleFileChange} />
                     </label>
                 )}
             </div>
+            {description && (
+                <p className="text-[10px] text-gray-400 leading-tight">
+                    {description}
+                </p>
+            )}
         </div>
     );
 };
@@ -163,6 +198,11 @@ const GlobalSettingsPage = () => {
         if (faviconFile) formData.append('favicon', faviconFile);
         if (kopSuratFile) formData.append('kop_surat', kopSuratFile);
 
+        // Add delete flags if existing images were cleared but no new file is uploaded
+        if (!settings.logo_path && !logoFile) formData.append('remove_logo', 'true');
+        if (!settings.favicon_path && !faviconFile) formData.append('remove_favicon', 'true');
+        if (!settings.kop_surat_path && !kopSuratFile) formData.append('remove_kop_surat', 'true');
+
         try {
             const response = await axios.put(
                 `/settings`,
@@ -229,21 +269,22 @@ const GlobalSettingsPage = () => {
                 </button>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-8">
-                {/* Tabs Sidebar */}
-                <div className="w-full md:w-64 space-y-1">
+            <div className="flex flex-col gap-8">
+                {/* Tabs Navigation (Top) */}
+                <div className="flex flex-wrap items-center gap-2 p-1.5 bg-gray-100 dark:bg-gray-900/50 rounded-2xl w-fit">
                     {tabs.map(tab => {
                         const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
                         return (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.id
-                                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20 active:scale-95'
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800 hover:shadow-sm'
+                                className={`flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${isActive
+                                    ? 'bg-white dark:bg-gray-800 text-primary-600 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-800/50'
                                     }`}
                             >
-                                <Icon className="w-5 h-5" />
+                                <Icon className={`w-4 h-4 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
                                 {tab.label}
                             </button>
                         );
@@ -257,10 +298,42 @@ const GlobalSettingsPage = () => {
                             <div className="space-y-8 animate-in fade-in slide-in-from-right-2 duration-300">
                                 <div>
                                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Logo & Branding</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <LogoUploader label="Logo Institusi" currentImage={settings.logo_path} onFileSelect={setLogoFile} onDelete={() => setLogoFile(null)} />
-                                        <LogoUploader label="Favicon" currentImage={settings.favicon_path} onFileSelect={setFaviconFile} onDelete={() => setFaviconFile(null)} />
-                                        <LogoUploader label="Kop Surat" currentImage={settings.kop_surat_path} onFileSelect={setKopSuratFile} onDelete={() => setKopSuratFile(null)} />
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                                        <div className="grid grid-cols-2 gap-6 w-fit">
+                                            <LogoUploader
+                                                label="Logo Institusi"
+                                                currentImage={settings.logo_path}
+                                                onFileSelect={setLogoFile}
+                                                onDelete={() => {
+                                                    setLogoFile(null);
+                                                    setSettings(prev => ({ ...prev, logo_path: null }));
+                                                }}
+                                                description="Min. 512x512px. Maks 2MB (PNG/JPG)"
+                                            />
+                                            <LogoUploader
+                                                label="Favicon"
+                                                currentImage={settings.favicon_path}
+                                                onFileSelect={setFaviconFile}
+                                                onDelete={() => {
+                                                    setFaviconFile(null);
+                                                    setSettings(prev => ({ ...prev, favicon_path: null }));
+                                                }}
+                                                description="Min. 32x32px. Maks 100KB (ICO/PNG)"
+                                            />
+                                        </div>
+                                        <div className="w-full">
+                                            <LogoUploader
+                                                label="Kop Surat"
+                                                currentImage={settings.kop_surat_path}
+                                                onFileSelect={setKopSuratFile}
+                                                onDelete={() => {
+                                                    setKopSuratFile(null);
+                                                    setSettings(prev => ({ ...prev, kop_surat_path: null }));
+                                                }}
+                                                className="aspect-[5/1] w-full max-w-lg"
+                                                description="Rec. 700x140px. Maks 5MB (PNG/JPG)"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 

@@ -82,18 +82,14 @@ export const exportRPSToPDF = async (course, rpsData) => {
 
         // Add logo
         try {
-            const logoPath = globalSettings?.logo_path ? `${import.meta.env.VITE_API_URL}/${globalSettings.logo_path}` : '/logo-mahardika.jpg';
-            const logoImg = await loadImage(logoPath);
-            doc.addImage(logoImg, 'JPEG', margin, 10, 20, 20);
-        } catch (error) {
-            console.warn('Logo not loaded:', error);
-            // Fallback to default if custom fails
-            try {
-                const defaultLogo = await loadImage('/logo-mahardika.jpg');
-                doc.addImage(defaultLogo, 'JPEG', margin, 10, 20, 20);
-            } catch (e2) {
-                console.warn('Default logo also failed');
+            if (globalSettings?.logo_path) {
+                const logoPath = `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${globalSettings.logo_path}?t=${new Date().getTime()}`;
+                const logoImg = await loadImage(logoPath);
+                doc.addImage(logoImg, 'JPEG', margin, 10, 20, 20);
             }
+        } catch (error) {
+            console.warn('Logo not loaded for PDF:', error);
+            // No fallback image, it will just show text header
         }
 
         // Header text

@@ -17,7 +17,7 @@ export const generateRPSPDF = (rpsData) => {
         doc.text('RENCANA PEMBELAJARAN SEMESTER (RPS)', pageWidth / 2, 15, { align: 'center' });
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text('Institut Teknologi dan Kesehatan Mahardika', pageWidth / 2, 22, { align: 'center' });
+        doc.text('INSTITUSI PENDIDIKAN', pageWidth / 2, 22, { align: 'center' });
         doc.line(15, 26, pageWidth - 15, 26);
     };
 

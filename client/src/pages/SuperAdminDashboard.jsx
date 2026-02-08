@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import useAuthStore from '../store/useAuthStore';
 import useThemeStore from '../store/useThemeStore';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
+import useGlobalStore from '../store/useGlobalStore';
 import {
     FaUniversity,
     FaUsers,
@@ -51,7 +52,16 @@ const ROLE_COLORS = {
 const SuperAdminDashboard = () => {
     const { user, logout } = useAuthStore();
     const { theme, toggleTheme } = useThemeStore();
+    const { settings } = useGlobalStore();
     const location = useLocation();
+
+    const appName = settings?.nama_pt || 'Institut Teknologi dan Kesehatan Mahardika';
+    const initials = appName
+        ?.split(' ')
+        .map(n => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || '??';
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const profileRef = useRef(null);
@@ -367,8 +377,34 @@ const SuperAdminDashboard = () => {
         <div className="flex h-screen bg-gray-50 dark:bg-gray-950 transition-colors">
             {/* Sidebar */}
             <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:shadow-none border-r dark:border-gray-800 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                <div className="p-6 border-b dark:border-gray-800">
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                {/* Branding Sidebar Header */}
+                <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100 dark:border-gray-800 shrink-0">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg w-10 h-10 flex items-center justify-center overflow-hidden border dark:border-gray-700 shadow-sm shrink-0">
+                        <img
+                            src={settings?.logo_path
+                                ? `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${settings.logo_path}?t=${new Date().getTime()}`
+                                : null}
+                            alt={settings?.nama_pt || 'Institut Mahardika'}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                            }}
+                        />
+                        <div style={{ display: 'none' }} className="w-full h-full bg-primary-600 flex items-center justify-center text-white font-bold text-xs uppercase tracking-tighter">
+                            {initials}
+                        </div>
+                    </div>
+                    <div>
+                        <h1 className="font-bold text-gray-900 dark:text-white text-lg tracking-tight">SAMPIRANS</h1>
+                        <p className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium line-clamp-2 max-w-[150px] leading-tight">
+                            {settings?.nama_pt || 'Institut Teknologi dan Kesehatan Mahardika'}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="px-6 py-3 border-b dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+                    <h2 className="text-sm font-bold text-gray-800 dark:text-white flex items-center gap-2">
                         <FaCogs className="text-primary-600 dark:text-primary-500" />
                         Panel Admin
                     </h2>

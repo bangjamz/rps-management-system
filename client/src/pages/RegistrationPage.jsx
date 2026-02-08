@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
 import { BookOpen, User, Mail, Lock, Shield, School, ArrowRight } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import useGlobalStore from '../store/useGlobalStore';
 import axios from '../lib/axios';
 
 export default function RegistrationPage() {
@@ -20,6 +20,19 @@ export default function RegistrationPage() {
     const [loading, setLoading] = useState(false);
 
     const navigate = useNavigate();
+    const { settings } = useGlobalStore();
+
+    const appName = settings?.nama_pt || 'Institut Teknologi dan Kesehatan Mahardika';
+    const appLogo = settings?.logo_path
+        ? `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${settings.logo_path}?t=${new Date().getTime()}`
+        : null;
+
+    const initials = appName
+        ?.split(' ')
+        .map(n => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || '??';
 
     // Fetch lists of prodi for selection
     useEffect(() => {
@@ -83,15 +96,21 @@ export default function RegistrationPage() {
                 {/* Header */}
                 <div className="text-center mb-10">
                     <Link to="/login" className="inline-block">
-                        <div className="bg-primary-600 rounded-2xl w-16 h-16 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary-500/30">
-                            <BookOpen className="w-8 h-8 text-white" />
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 shadow-soft overflow-hidden border border-gray-100 dark:border-gray-800">
+                            {appLogo ? (
+                                <img src={appLogo} alt={appName} className="w-full h-full object-contain p-2" />
+                            ) : (
+                                <div className="w-full h-full bg-primary-600 flex items-center justify-center text-white font-bold text-2xl">
+                                    {initials}
+                                </div>
+                            )}
                         </div>
                     </Link>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                         Buat Akun Baru
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400">
-                        Bergabunglah dengan Sistem Akademik Mahardika
+                    <p className="text-gray-500 dark:text-gray-400 font-medium px-4">
+                        {appName}
                     </p>
                 </div>
 

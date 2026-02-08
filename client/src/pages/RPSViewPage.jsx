@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../lib/axios';
+import { Building2 } from 'lucide-react';
 import { exportRPSToPDF } from '../utils/rpsExport';
 
 export default function RPSViewPage() {
@@ -157,12 +158,20 @@ export default function RPSViewPage() {
                             <tbody>
                                 <tr>
                                     <td className="border border-black p-2 w-24 text-center align-middle">
-                                        <img
-                                            src={settings?.logo_path ? `${import.meta.env.VITE_API_URL}/${settings.logo_path}` : "/logo-mahardika.jpg"}
-                                            alt="Logo"
-                                            className="w-20 h-20 object-contain mx-auto"
-                                            onError={(e) => { e.target.src = "/logo-mahardika.jpg"; }}
-                                        />
+                                        {settings?.logo_path ? (
+                                            <img
+                                                src={`${import.meta.env.VITE_API_URL?.replace('/api', '')}/${settings.logo_path}?t=${new Date().getTime()}`}
+                                                alt="Logo"
+                                                className="w-20 h-20 object-contain mx-auto"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                            />
+                                        ) : null}
+                                        <div className={`${settings?.logo_path ? 'hidden' : 'flex'} w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-lg items-center justify-center mx-auto text-primary-600`}>
+                                            <Building2 size={32} />
+                                        </div>
                                     </td>
                                     <td className="border border-black p-2 text-center align-middle">
                                         <h1 className="font-bold text-lg">RENCANA PEMBELAJARAN SEMESTER</h1>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
+import useGlobalStore from '../store/useGlobalStore';
 import axios from '../lib/axios';
 
 import HelpModal from '../components/HelpModal';
@@ -15,6 +16,19 @@ export default function LoginPage() {
 
     const navigate = useNavigate();
     const setAuth = useAuthStore((state) => state.setAuth);
+    const { settings } = useGlobalStore();
+
+    const appName = settings?.nama_pt || 'Institut Teknologi dan Kesehatan Mahardika';
+    const appLogo = settings?.logo_path
+        ? `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${settings.logo_path}?t=${new Date().getTime()}`
+        : null;
+
+    const initials = appName
+        ?.split(' ')
+        .map(n => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || '??';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -51,14 +65,20 @@ export default function LoginPage() {
             <div className="w-full max-w-md">
                 {/* Logo & Title */}
                 <div className="text-center mb-10">
-                    <div className="bg-primary-600 rounded-2xl w-16 h-16 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary-500/30">
-                        <BookOpen className="w-8 h-8 text-white" />
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl w-20 h-20 flex items-center justify-center mx-auto mb-6 shadow-soft overflow-hidden border border-gray-100 dark:border-gray-800">
+                        {appLogo ? (
+                            <img src={appLogo} alt={appName} className="w-full h-full object-contain p-2" />
+                        ) : (
+                            <div className="w-full h-full bg-primary-600 flex items-center justify-center text-white font-bold text-2xl">
+                                {initials}
+                            </div>
+                        )}
                     </div>
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 mb-2">
                         SAMPIRANS
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400">
-                        Sistem Akademik dan Informasi Pembelajaran Semester
+                    <p className="text-gray-500 dark:text-gray-400 font-medium px-4">
+                        {appName}
                     </p>
                 </div>
 
@@ -153,7 +173,7 @@ export default function LoginPage() {
 
                 {/* Footer */}
                 <p className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                    © 2026 Institut Teknologi dan Kesehatan Mahardika
+                    © {new Date().getFullYear()} {appName}
                 </p>
                 <div className="mt-8 flex justify-center">
                     <button

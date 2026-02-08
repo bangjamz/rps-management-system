@@ -62,13 +62,13 @@ export const updateSettings = async (req, res) => {
             }
         }
 
-        // Handle file uploads
+        // Handle file uploads and deletions
         if (req.files) {
             console.log('Files received:', Object.keys(req.files));
             if (req.files.logo) {
                 console.log('Processing logo:', req.files.logo[0].filename);
                 if (settings.logo_path) {
-                    const oldPath = path.join(__dirname, '../../', settings.logo_path);
+                    const oldPath = path.join(__dirname, '../', settings.logo_path);
                     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
                 }
                 settings.logo_path = 'uploads/settings/' + req.files.logo[0].filename;
@@ -78,7 +78,7 @@ export const updateSettings = async (req, res) => {
             if (req.files.favicon) {
                 console.log('Processing favicon:', req.files.favicon[0].filename);
                 if (settings.favicon_path) {
-                    const oldPath = path.join(__dirname, '../../', settings.favicon_path);
+                    const oldPath = path.join(__dirname, '../', settings.favicon_path);
                     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
                 }
                 settings.favicon_path = 'uploads/settings/' + req.files.favicon[0].filename;
@@ -88,12 +88,40 @@ export const updateSettings = async (req, res) => {
             if (req.files.kop_surat) {
                 console.log('Processing kop surat:', req.files.kop_surat[0].filename);
                 if (settings.kop_surat_path) {
-                    const oldPath = path.join(__dirname, '../../', settings.kop_surat_path);
+                    const oldPath = path.join(__dirname, '../', settings.kop_surat_path);
                     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
                 }
                 settings.kop_surat_path = 'uploads/settings/' + req.files.kop_surat[0].filename;
                 settings.kop_surat_filename = req.files.kop_surat[0].originalname;
             }
+        }
+
+        // Handle explicit deletions
+        if (req.body.remove_logo === 'true' && !req.files?.logo) {
+            if (settings.logo_path) {
+                const oldPath = path.join(__dirname, '../', settings.logo_path);
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+            }
+            settings.logo_path = null;
+            settings.logo_filename = null;
+        }
+
+        if (req.body.remove_favicon === 'true' && !req.files?.favicon) {
+            if (settings.favicon_path) {
+                const oldPath = path.join(__dirname, '../', settings.favicon_path);
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+            }
+            settings.favicon_path = null;
+            settings.favicon_filename = null;
+        }
+
+        if (req.body.remove_kop_surat === 'true' && !req.files?.kop_surat) {
+            if (settings.kop_surat_path) {
+                const oldPath = path.join(__dirname, '../', settings.kop_surat_path);
+                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+            }
+            settings.kop_surat_path = null;
+            settings.kop_surat_filename = null;
         }
 
         await settings.save();
