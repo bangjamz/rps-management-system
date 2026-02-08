@@ -6,7 +6,7 @@ import { Op } from 'sequelize';
 export const getAllCourses = async (req, res) => {
     try {
         const user = req.user;
-        const { fakultasId, prodiId, semester } = req.query;
+        const { fakultasId, prodiId, semester, search } = req.query;
 
         console.log('DEBUG: getAllCourses', {
             role: user.role,
@@ -14,15 +14,29 @@ export const getAllCourses = async (req, res) => {
             userProdi: user.prodi_id,
             querySem: semester,
             queryFak: fakultasId,
-            queryProdi: prodiId
+            queryProdi: prodiId,
+            querySearch: search
         });
 
         let whereClause = {};
 
-        // 1. Role-based Scope (from middleware)
-        // Admin gets empty scope, so they see all by default but can filter below.
-        // Kaprodi/Dosen get specific scope (e.g. { prodi_id: 1 })
-        Object.assign(whereClause, req.dataScope);
+        // 1. Role-based Scope
+        if (Object.keys(req.dataScope).length > 0) {
+            if (user.role === 'dekan') {
+                whereClause[Op.or] = [
+                    { fakultas_id: req.dataScope.fakultas_id },
+                    { '$prodi.fakultas_id$': req.dataScope.fakultas_id },
+                    { scope: 'institusi' }
+                ];
+            } else {
+                whereClause[Op.or] = [
+                    req.dataScope,
+                    { scope: 'institusi' }
+                ];
+            }
+        } else {
+            Object.assign(whereClause, req.dataScope);
+        }
 
         // 2. Query Param Overrides (Admin only)
         // If user is admin (empty scope), allow filtering by params
@@ -31,27 +45,25 @@ export const getAllCourses = async (req, res) => {
             if (prodiId) whereClause.prodi_id = prodiId;
         }
 
-        // 3. Dekan Special Case (Complex OR logic)
-        // Middleware sets { fakultas_id: X }. 
-        // We might want to expand this to "Courses in this Fakultas OR Courses in Prodis of this Fakultas"
-        // But for now, let's trust the middleware's simplistic scope or handle special cases if needed.
-        if (user.role === 'dekan') {
-            // If middleware set valid fakultas_id
-            if (req.dataScope.fakultas_id) {
-                delete whereClause.fakultas_id; // Remove simple equality check
-                whereClause[Op.or] = [
-                    { fakultas_id: req.dataScope.fakultas_id },
-                    { '$prodi.fakultas_id$': req.dataScope.fakultas_id }
-                ];
-            }
-        }
-
         // 2. Common Filter: Semester (ensure type safety)
         if (semester) {
             whereClause.semester = parseInt(semester);
         }
 
-        // 3. Build Query Options
+        // 3. Search Filter
+        if (search) {
+            whereClause[Op.and] = [
+                ...(whereClause[Op.and] || []), // Preserve existing AND conditions if any
+                {
+                    [Op.or]: [
+                        { nama_mk: { [Op.iLike]: `%${search}%` } },
+                        { kode_mk: { [Op.iLike]: `%${search}%` } }
+                    ]
+                }
+            ];
+        }
+
+        // 4. Build Query Options
         const queryOptions = {
             where: whereClause,
             include: [
@@ -121,7 +133,7 @@ export const getCourseById = async (req, res) => {
 // Create course
 export const createCourse = async (req, res) => {
     try {
-        const { kode_mk, nama_mk, sks, sks_teori, sks_praktek, semester, prodi_id } = req.body;
+        const { kode_mk, nama_mk, sks, sks_teori, sks_praktek, semester, prodi_id, scope, fakultas_id } = req.body;
 
         // Auto-calculate Total SKS
         const totalSks = sks || (parseInt(sks_teori || 0) + parseInt(sks_praktek || 0));
@@ -133,7 +145,9 @@ export const createCourse = async (req, res) => {
             sks_teori: sks_teori || 0,
             sks_praktek: sks_praktek || 0,
             semester,
-            prodi_id: prodi_id || req.user.prodi_id
+            prodi_id: prodi_id || (scope === 'prodi' ? req.user.prodi_id : null),
+            scope: scope || 'prodi',
+            fakultas_id: fakultas_id || (scope === 'fakultas' ? req.user.fakultas_id : null)
         });
 
         res.status(201).json(course);

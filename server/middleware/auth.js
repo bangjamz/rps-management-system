@@ -9,7 +9,8 @@ export const ROLES = {
     DEKAN: 'dekan',
     KAPRODI: 'kaprodi',
     DOSEN: 'dosen',
-    MAHASISWA: 'mahasiswa'
+    MAHASISWA: 'mahasiswa',
+    QA: 'penjaminan_mutu'
 };
 
 export const ORG_LEVELS = {

@@ -29,10 +29,13 @@ import CPLAnalyticsPage from './pages/CPLAnalyticsPage';
 import DataDosenPage from './pages/DataDosenPage';
 import KaprodiMKAktifPage from './pages/KaprodiMKAktifPage'; // Add this line
 import SuperAdminDashboard from './pages/SuperAdminDashboard'; // Add this line
-import GlobalSettingsPage from './pages/GlobalSettingsPage'; // Add this line
+import GlobalSettingsPage from './pages/GlobalSettingsPage';
+import DekanDashboard from './pages/DekanDashboard'; // Add this line
+import QADashboard from './pages/QADashboard'; // Add this line
 import UserRolesPage from './pages/UserRolesPage';
 import OrganizationManagementPage from './pages/OrganizationManagementPage';
 import AcademicSettingsPage from './pages/AcademicSettingsPage';
+import AdminCoursesPage from './pages/AdminCoursesPage';
 import { ROLES } from './utils/permissions';
 import useAuthStore from './store/useAuthStore';
 
@@ -52,6 +55,10 @@ const Dashboard = () => {
         case 'superadmin':
         case 'admin':
             return <Navigate to="/super-admin" replace />;
+        case 'dekan':
+            return <Navigate to="/dekan/dashboard" replace />;
+        case 'penjaminan_mutu':
+            return <Navigate to="/qa/dashboard" replace />;
         default:
             return (
                 <div className="p-8 text-center">
@@ -167,6 +174,43 @@ function App() {
                             </DashboardLayout>
                         </ProtectedRoute>
                     }
+
+                />
+
+                {/* Dekan Routes */}
+                <Route
+                    path="/dekan/*"
+                    element={
+                        <ProtectedRoute allowedRoles={['dekan']}>
+                            <DashboardLayout>
+                                <Routes>
+                                    <Route path="dashboard" element={<DekanDashboard />} />
+                                    <Route path="rps-approval" element={<RPSManagementPage />} />
+                                    <Route path="curriculum" element={<CurriculumPage />} />
+                                    <Route path="courses" element={<CoursesPage />} />
+                                    <Route path="rps-summary" element={<RPSManagementPage />} />
+                                    <Route path="rps/view/:rpsId" element={<RPSViewPage />} />
+                                </Routes>
+                            </DashboardLayout>
+                        </ProtectedRoute>
+                    }
+                />
+
+                {/* QA Routes */}
+                <Route
+                    path="/qa/*"
+                    element={
+                        <ProtectedRoute allowedRoles={['penjaminan_mutu']}>
+                            <DashboardLayout>
+                                <Routes>
+                                    <Route path="dashboard" element={<QADashboard />} />
+                                    <Route path="rps-approval" element={<RPSManagementPage />} />
+                                    <Route path="rps-summary" element={<RPSManagementPage />} />
+                                    <Route path="rps/view/:rpsId" element={<RPSViewPage />} />
+                                </Routes>
+                            </DashboardLayout>
+                        </ProtectedRoute>
+                    }
                 />
 
                 <Route
@@ -226,6 +270,8 @@ function App() {
                     <Route path="roles" element={<UserRolesPage />} />
                     <Route path="organization" element={<OrganizationManagementPage />} />
                     <Route path="academic" element={<AcademicSettingsPage />} />
+                    <Route path="courses" element={<AdminCoursesPage />} />
+                    <Route path="curriculum" element={<CurriculumPage />} />
                 </Route>
 
                 {/* Default Redirect */}

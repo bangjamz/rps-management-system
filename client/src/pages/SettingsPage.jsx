@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Camera, User, Plus, Edit, Check, X, Calendar } from 'lucide-react';
+import { Camera, User, Plus, Edit, Check, X, Calendar, Upload } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
 import useThemeStore from '../store/useThemeStore';
 import useAcademicStore from '../store/useAcademicStore';
@@ -163,6 +163,88 @@ export default function SettingsPage() {
             setMessage({ type: 'success', text: `Tahun ${semester} berhasil diaktifkan` });
         } catch (error) {
             setMessage({ type: 'error', text: 'Gagal mengaktifkan tahun akademik' });
+        }
+    };
+
+    // --- Signature Pad Logic ---
+    const [showSignaturePad, setShowSignaturePad] = useState(false);
+    const canvasRef = useRef(null);
+    const isDrawing = useRef(false);
+
+    // Initialize canvas context
+    useEffect(() => {
+        if (showSignaturePad && canvasRef.current) {
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#000000';
+
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+        }
+    }, [showSignaturePad]);
+
+    const getCoordinates = (e) => {
+        if (!canvasRef.current) return { x: 0, y: 0 };
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    };
+
+    const startDrawing = (e) => {
+        isDrawing.current = true;
+        const { x, y } = getCoordinates(e);
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+    };
+
+    const draw = (e) => {
+        if (!isDrawing.current) return;
+        e.preventDefault();
+        const { x, y } = getCoordinates(e);
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.lineTo(x, y);
+        ctx.stroke();
+    };
+
+    const stopDrawing = () => {
+        if (!isDrawing.current) return;
+        isDrawing.current = false;
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.closePath();
+    };
+
+    const clearCanvas = () => {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Note: clearing with scaled width/height
+    };
+
+    const saveSignature = async () => {
+        const canvas = canvasRef.current;
+        const dataUrl = canvas.toDataURL('image/png');
+
+        try {
+            setLoading(true);
+            await axios.post('/auth/signature', { signature: dataUrl });
+            // Update user in store (need to fetch latest user or manually update)
+            const updatedUser = { ...user, signature: dataUrl };
+            updateUser(updatedUser);
+
+            setMessage({ type: 'success', text: 'Tanda tangan berhasil disimpan' });
+            setShowSignaturePad(false);
+        } catch (error) {
+            console.error('Save signature error:', error);
+            setMessage({ type: 'error', text: 'Gagal menyimpan tanda tangan' });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -373,6 +455,134 @@ export default function SettingsPage() {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Signature Section */}
+                <div className="card p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                        Tanda Tangan Digital
+                    </h2>
+                    <p className="text-sm text-gray-500 mb-6">
+                        Tanda tangan ini akan digunakan secara otomatis pada dokumen RPS dan laporannya.
+                    </p>
+
+                    <div className="flex flex-col md:flex-row gap-6">
+                        {/* Preview / Canvas Area */}
+                        <div className="flex-1">
+                            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-900/50 h-48 relative flex items-center justify-center overflow-hidden group">
+                                {user?.signature ? (
+                                    <>
+                                        <img src={user.signature} alt="Signature" className="max-h-full max-w-full object-contain p-4" />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-sm">
+                                            <button
+                                                onClick={async () => {
+                                                    if (window.confirm('Hapus tanda tangan?')) {
+                                                        try {
+                                                            setLoading(true);
+                                                            await axios.post('/auth/signature', { signature: null });
+                                                            updateUser({ ...user, signature: null });
+                                                            setMessage({ type: 'success', text: 'Tanda tangan dihapus' });
+                                                        } catch (e) { setMessage({ type: 'error', text: 'Gagal menghapus' }); }
+                                                        finally { setLoading(false); }
+                                                    }
+                                                }}
+                                                className="btn btn-sm btn-error text-white"
+                                            >
+                                                <X className="w-4 h-4" /> Hapus
+                                            </button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <span className="text-gray-400 text-sm">Belum ada tanda tangan</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex flex-col gap-3 w-full md:w-48">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                id="sig-upload"
+                                className="hidden"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const formData = new FormData();
+                                    formData.append('signature', file);
+                                    try {
+                                        setLoading(true);
+                                        const res = await axios.post('/auth/signature', formData, {
+                                            headers: { 'Content-Type': 'multipart/form-data' }
+                                        });
+                                        // Assumption: backend returns updated user or we refresh
+                                        // For now, let's assume we need to reload or manually set logic if backend returns url
+                                        // Better to fetch profile or check auth check
+                                        // The backend likely updates session. Let's try manual update if we knew the URL, 
+                                        // but since it's an upload, we might need the response.
+                                        // Let's assume response.data.signature or similar.
+                                        // If not, we trigger a fetch
+                                        await axios.get('/auth/me').then(r => updateUser(r.data));
+
+                                        setMessage({ type: 'success', text: 'Tanda tangan diupload' });
+                                    } catch (e) { setMessage({ type: 'error', text: 'Upload gagal' }); }
+                                    finally { setLoading(false); }
+                                }}
+                            />
+                            <button onClick={() => document.getElementById('sig-upload').click()} className="btn btn-outline btn-sm justify-start" disabled={loading}>
+                                <Upload className="w-4 h-4 mr-2" /> Upload Gambar
+                            </button>
+
+                            <button
+                                onClick={() => setShowSignaturePad(true)}
+                                className="btn btn-outline btn-sm justify-start"
+                                disabled={loading}
+                            >
+                                <span className="w-4 h-4 mr-2">✏️</span> Gambar (Draw)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Signature Pad Modal */}
+                {showSignaturePad && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-scale-in">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-lg text-gray-900 dark:text-white">Gambar Tanda Tangan</h3>
+                                <button onClick={() => setShowSignaturePad(false)} className="btn btn-ghost btn-circle btn-sm">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="border border-gray-300 rounded-lg overflow-hidden bg-white touch-none">
+                                <canvas
+                                    ref={canvasRef}
+                                    width={500}
+                                    height={200}
+                                    className="w-full h-48 cursor-crosshair"
+                                    onMouseDown={startDrawing}
+                                    onMouseMove={draw}
+                                    onMouseUp={stopDrawing}
+                                    onMouseLeave={stopDrawing}
+                                    onTouchStart={startDrawing}
+                                    onTouchMove={draw}
+                                    onTouchEnd={stopDrawing}
+                                />
+                            </div>
+                            <p className="text-xs text-gray-400 mt-2 text-center">Tanda tangan di dalam kotak di atas</p>
+
+                            <div className="flex justify-between mt-6">
+                                <button onClick={clearCanvas} className="btn btn-sm btn-ghost text-red-500">
+                                    Reset
+                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowSignaturePad(false)} className="btn btn-sm">Batal</button>
+                                    <button onClick={saveSignature} className="btn btn-sm btn-primary">Simpan</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

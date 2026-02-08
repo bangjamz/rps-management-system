@@ -29,7 +29,7 @@ router.post('/:userId/approve', authorize(['superadmin', 'admin_institusi', 'adm
 router.post('/:userId/reject', authorize(['superadmin', 'admin_institusi', 'admin']), rejectUser);
 
 // List all users
-router.get('/', authorize(['superadmin', 'admin_institusi', 'admin']), getAllUsers);
+router.get('/', authorize(['superadmin', 'admin_institusi', 'admin', 'dosen', 'kaprodi']), getAllUsers);
 
 // Promote/Demote (Superadmin only)
 router.post('/:userId/role', authorize(['superadmin', 'admin_institusi']), changeUserRole);

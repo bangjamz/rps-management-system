@@ -7,7 +7,9 @@ import {
     updateProfile,
     changePassword,
     uploadProfilePicture,
-    uploadCoverImage
+    uploadCoverImage,
+    uploadSignature,
+    getPublicSignatures
 } from '../controllers/authController.js';
 import {
     impersonateUser,
@@ -72,6 +74,8 @@ const upload = multer({
 
 router.post('/profile-picture', authenticate, upload.single('photo'), uploadProfilePicture);
 router.post('/cover-image', authenticate, upload.single('cover'), uploadCoverImage);
+router.post('/signature', authenticate, upload.single('signature'), uploadSignature);
+router.get('/signatures', authenticate, getPublicSignatures);
 
 export default router;
 

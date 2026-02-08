@@ -71,6 +71,16 @@ const RPS = sequelize.define('RPS', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    dekan: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Nama Dekan'
+    },
+    penjaminan_mutu: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: 'Nama Penjaminan Mutu'
+    },
     jumlah_pertemuan: {
         type: DataTypes.INTEGER,
         allowNull: false,

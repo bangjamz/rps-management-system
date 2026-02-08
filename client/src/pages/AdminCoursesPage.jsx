@@ -234,6 +234,27 @@ const EditCourseModal = ({ course, isOpen, onClose, onSave }) => {
         prodi_id: null
     });
 
+    // Fetch options for Admin
+    const [fakultasList, setFakultasList] = useState([]);
+    const [prodiList, setProdiList] = useState([]);
+
+    useEffect(() => {
+        // Load fakultas and prodi for dropdowns
+        const loadOrgData = async () => {
+            try {
+                const [fakRes, prodiRes] = await Promise.all([
+                    axios.get('/organization/fakultas'),
+                    axios.get('/organization/prodi')
+                ]);
+                setFakultasList(fakRes.data);
+                setProdiList(prodiRes.data);
+            } catch (err) {
+                console.error('Failed to load org data', err);
+            }
+        };
+        loadOrgData();
+    }, []);
+
     useEffect(() => {
         if (course) {
             setFormData({
@@ -343,6 +364,51 @@ const EditCourseModal = ({ course, isOpen, onClose, onSave }) => {
                         </select>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="label">Level (Scope)</label>
+                            <select
+                                className="input"
+                                value={formData.scope}
+                                onChange={(e) => setFormData({ ...formData, scope: e.target.value, fakultas_id: null, prodi_id: null })}
+                            >
+                                <option value="institusi">Institusi</option>
+                                <option value="fakultas">Fakultas</option>
+                                <option value="prodi">Program Studi</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label">Unit</label>
+                            {formData.scope === 'institusi' ? (
+                                <input type="text" className="input bg-gray-100" value="-" readOnly />
+                            ) : formData.scope === 'fakultas' ? (
+                                <select
+                                    className="input"
+                                    value={formData.fakultas_id || ''}
+                                    onChange={(e) => setFormData({ ...formData, fakultas_id: e.target.value })}
+                                    required
+                                >
+                                    <option value="">Pilih Fakultas</option>
+                                    {fakultasList.map(f => (
+                                        <option key={f.id} value={f.id}>{f.nama}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <select
+                                    className="input"
+                                    value={formData.prodi_id || ''}
+                                    onChange={(e) => setFormData({ ...formData, prodi_id: e.target.value })}
+                                    required
+                                >
+                                    <option value="">Pilih Prodi</option>
+                                    {prodiList.map(p => (
+                                        <option key={p.id} value={p.id}>{p.nama}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="flex justify-end gap-2 mt-6">
                         <button type="button" onClick={onClose} className="btn btn-ghost">Batal</button>
                         <button type="submit" className="btn btn-primary">Simpan Perubahan</button>
@@ -353,7 +419,7 @@ const EditCourseModal = ({ course, isOpen, onClose, onSave }) => {
     );
 };
 
-const AddCourseModal = ({ isOpen, onClose, onSave, user }) => {
+const AddCourseModal = ({ isOpen, onClose, onSave }) => {
     const [formData, setFormData] = useState({
         kode_mk: '',
         nama_mk: '',
@@ -362,9 +428,30 @@ const AddCourseModal = ({ isOpen, onClose, onSave, user }) => {
         sks_praktek: 0,
         semester: 1,
         scope: 'prodi',
-        fakultas_id: user?.fakultas_id || null,
-        prodi_id: user?.prodi_id || null
+        fakultas_id: null,
+        prodi_id: null
     });
+
+    const [fakultasList, setFakultasList] = useState([]);
+    const [prodiList, setProdiList] = useState([]);
+
+    useEffect(() => {
+        if (isOpen) {
+            const loadOrgData = async () => {
+                try {
+                    const [fakRes, prodiRes] = await Promise.all([
+                        axios.get('/organization/fakultas'),
+                        axios.get('/organization/prodi')
+                    ]);
+                    setFakultasList(fakRes.data);
+                    setProdiList(prodiRes.data);
+                } catch (err) {
+                    console.error('Failed to load org data', err);
+                }
+            };
+            loadOrgData();
+        }
+    }, [isOpen]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -463,14 +550,44 @@ const AddCourseModal = ({ isOpen, onClose, onSave, user }) => {
                             <select
                                 className="input"
                                 value={formData.scope}
-                                onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
-                                disabled // Locked for Kaprodi
+                                onChange={(e) => setFormData({ ...formData, scope: e.target.value, fakultas_id: null, prodi_id: null })}
                             >
-                                <option value="prodi">Program Studi</option>
-                                <option value="fakultas">Fakultas</option>
                                 <option value="institusi">Institusi</option>
+                                <option value="fakultas">Fakultas</option>
+                                <option value="prodi">Program Studi</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="label">Unit</label>
+                        {formData.scope === 'institusi' ? (
+                            <input type="text" className="input bg-gray-100" value="-" readOnly />
+                        ) : formData.scope === 'fakultas' ? (
+                            <select
+                                className="input"
+                                value={formData.fakultas_id || ''}
+                                onChange={(e) => setFormData({ ...formData, fakultas_id: e.target.value })}
+                                required
+                            >
+                                <option value="">Pilih Fakultas</option>
+                                {fakultasList.map(f => (
+                                    <option key={f.id} value={f.id}>{f.nama}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <select
+                                className="input"
+                                value={formData.prodi_id || ''}
+                                onChange={(e) => setFormData({ ...formData, prodi_id: e.target.value })}
+                                required
+                            >
+                                <option value="">Pilih Prodi</option>
+                                {prodiList.map(p => (
+                                    <option key={p.id} value={p.id}>{p.nama}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
 
                     <div className="flex justify-end gap-2 mt-6">
@@ -511,7 +628,7 @@ const ViewToggle = ({ viewMode, setViewMode }) => (
 
 // --- Main Component ---
 
-export default function CoursesPage() {
+export default function AdminCoursesPage() {
     const navigate = useNavigate();
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -527,14 +644,14 @@ export default function CoursesPage() {
     const [showAddModal, setShowAddModal] = useState(false);
 
     // Advanced Filters State
-    // State Filter Lanjutan
-    const user = useAuthStore((state) => state.user); // Optimasi selector untuk mencegah render ulang yang tidak perlu
+    const user = useAuthStore((state) => state.user);
     const [selectedFakultas, setSelectedFakultas] = useState('');
     const [selectedProdi, setSelectedProdi] = useState('');
+    const [selectedSemester, setSelectedSemester] = useState(''); // New filter for SuperAdmin
+
     const [fakultasList, setFakultasList] = useState([]);
     const [prodiList, setProdiList] = useState([]);
 
-    // Helper untuk Swal yang mendukung tema
     const getSwalConfig = (overrides = {}) => {
         const isDarkMode = document.documentElement.classList.contains('dark');
         return {
@@ -554,51 +671,40 @@ export default function CoursesPage() {
     };
 
     useEffect(() => {
-        if (user) {
-            fetchFilters();
-        }
-    }, [user]);
+        fetchFilters();
+    }, []);
 
-    // Menggunakan useCallback untuk loadCourses agar referensi fungsi stabil
     const loadCourses = useCallback(async () => {
         setLoading(true);
         try {
             const params = {
-                // semester: activeSemester, // Hapus filter semester di backend jika frontend sudah filter lokal
                 search: searchQuery
             };
 
             if (selectedFakultas) params.fakultasId = selectedFakultas;
             if (selectedProdi) params.prodiId = selectedProdi;
+            if (selectedSemester) params.semester = selectedSemester; // Use selected semester filter
 
             const response = await axios.get('/courses', { params });
-            // console.log('DEBUG: Courses fetched:', response.data); // Hapus log debug untuk mengurangi spam
             setCourses(response.data);
         } catch (error) {
             console.error('Gagal memuat mata kuliah:', error);
         } finally {
             setLoading(false);
         }
-    }, [selectedFakultas, selectedProdi, searchQuery]); // Hapus activeSemester dari dependency array loadCourses jika tidak dikirim ke params
+    }, [selectedFakultas, selectedProdi, selectedSemester, searchQuery]);
 
-    // Effect untuk memanggil loadCourses saat dependency berubah
     useEffect(() => {
         loadCourses();
-    }, [loadCourses]); // Dependency array effect sekarang hanya loadCourses
+    }, [loadCourses]);
 
     const fetchFilters = async () => {
         try {
-            if (user?.role === 'admin_institusi') {
-                const fakRes = await axios.get('/organization/fakultas');
-                setFakultasList(fakRes.data);
-                const prodiRes = await axios.get('/organization/prodi');
-                setProdiList(prodiRes.data);
-            } else if (user?.role === 'dekan') {
-                const prodiRes = await axios.get('/organization/prodi', {
-                    params: { fakultasId: user.fakultas_id }
-                });
-                setProdiList(prodiRes.data);
-            }
+            // Always fetch for superadmin
+            const fakRes = await axios.get('/organization/fakultas');
+            setFakultasList(fakRes.data);
+            const prodiRes = await axios.get('/organization/prodi');
+            setProdiList(prodiRes.data);
         } catch (error) {
             console.error('Gagal memuat filter:', error);
         }
@@ -672,20 +778,10 @@ export default function CoursesPage() {
         }
     };
 
-    const filteredCourses = courses.filter(course => {
-        // Filter by semester from store (Ganjil/Genap)
-        // Mapped: 1,3,5,7 -> Ganjil; 2,4,6,8 -> Genap
-        const isGanjil = course.semester % 2 !== 0;
-        const courseSemesterType = isGanjil ? 'Ganjil' : 'Genap';
 
-        const matchSemester = activeSemester === courseSemesterType;
-        const matchSearch = course.nama_mk.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            course.kode_mk.toLowerCase().includes(searchQuery.toLowerCase());
+    const filteredCourses = courses; // No need to filter locally if API does it, but sorting works
 
-        return matchSemester && matchSearch;
-    });
-
-    // Import MK handler
+    // Import MK handler (Same logic)
     const handleImportMK = async () => {
         if (!importFile) return;
         setImporting(true);
@@ -771,41 +867,45 @@ export default function CoursesPage() {
                         />
                     </div>
 
-                    {/* Admin/Dekan Filters */}
-                    {user?.role === 'admin_institusi' && (
-                        <select
-                            className="input w-full md:w-48"
-                            value={selectedFakultas}
-                            onChange={(e) => {
-                                setSelectedFakultas(e.target.value);
-                                setSelectedProdi(''); // reset prodi when fakultas changes
-                            }}
-                        >
-                            <option value="">Semua Fakultas</option>
-                            {fakultasList.map(f => (
-                                <option key={f.id} value={f.id}>{f.nama}</option>
-                            ))}
-                        </select>
-                    )}
+                    <select
+                        className="input w-40"
+                        value={selectedSemester}
+                        onChange={(e) => setSelectedSemester(e.target.value)}
+                    >
+                        <option value="">Semua Semester</option>
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
+                            <option key={s} value={s}>Semester {s}</option>
+                        ))}
+                    </select>
 
-                    {(user?.role === 'admin_institusi' || user?.role === 'dekan') && (
-                        <select
-                            className="input w-full md:w-48"
-                            value={selectedProdi}
-                            onChange={(e) => setSelectedProdi(e.target.value)}
-                        >
-                            <option value="">Semua Prodi</option>
-                            {prodiList
-                                .filter(p => !selectedFakultas || p.fakultas_id == selectedFakultas)
-                                .map(p => (
-                                    <option key={p.id} value={p.id}>{p.nama}</option>
-                                ))
-                            }
-                        </select>
-                    )}
-                </div>
-                <div className="mt-2 text-sm text-gray-500">
-                    Menampilkan mata kuliah Semester {activeSemester} (Tahun Ajaran {activeYear})
+                    {/* Admin Filters - Always Visible */}
+                    <select
+                        className="input w-full md:w-48"
+                        value={selectedFakultas}
+                        onChange={(e) => {
+                            setSelectedFakultas(e.target.value);
+                            setSelectedProdi(''); // reset prodi when fakultas changes
+                        }}
+                    >
+                        <option value="">Semua Fakultas</option>
+                        {fakultasList.map(f => (
+                            <option key={f.id} value={f.id}>{f.nama}</option>
+                        ))}
+                    </select>
+
+                    <select
+                        className="input w-full md:w-48"
+                        value={selectedProdi}
+                        onChange={(e) => setSelectedProdi(e.target.value)}
+                    >
+                        <option value="">Semua Prodi</option>
+                        {prodiList
+                            .filter(p => !selectedFakultas || p.fakultas_id == selectedFakultas)
+                            .map(p => (
+                                <option key={p.id} value={p.id}>{p.nama}</option>
+                            ))
+                        }
+                    </select>
                 </div>
             </div>
 

@@ -260,3 +260,61 @@ export const uploadCoverImage = async (req, res) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 };
+
+export const uploadSignature = async (req, res) => {
+    try {
+        const { signature } = req.body; // Expecting base64 string or file path if handled by multer
+        const user = await User.findByPk(req.user.id);
+
+        // If it's a file upload via multer
+        if (req.file) {
+            const p = req.file.path.replace(/\\/g, '/');
+            user.signature = p.startsWith('/') ? p : '/' + p;
+        }
+        // If it's a base64 string (from canvas draw)
+        else if (signature && signature.startsWith('data:image')) {
+            // Save base64 as file
+            const fs = await import('fs');
+            const path = await import('path');
+            const base64Data = signature.replace(/^data:image\/\w+;base64,/, "");
+            const buffer = Buffer.from(base64Data, 'base64');
+
+            const uploadDir = 'uploads/signatures';
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+
+            const filename = `signature-${user.id}-${Date.now()}.png`;
+            const filepath = path.join(uploadDir, filename);
+
+            fs.writeFileSync(filepath, buffer);
+            user.signature = '/' + filepath; // key change: ensure valid web path
+        }
+        // If null passed (delete)
+        else if (signature === null) {
+            // Optional: delete old file
+            user.signature = null;
+        }
+
+        await user.save();
+        res.json({ message: 'Signature updated', user: { signature: user.signature } });
+    } catch (error) {
+        console.error('Signature upload error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+
+export const getPublicSignatures = async (req, res) => {
+    try {
+        const users = await User.findAll({
+            where: {
+                signature: { [Op.not]: null }
+            },
+            attributes: ['nama_lengkap', 'signature']
+        });
+        res.json(users);
+    } catch (error) {
+        console.error('Get signatures error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};

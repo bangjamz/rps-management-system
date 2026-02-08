@@ -90,32 +90,40 @@ export const getCPLs = async (req, res) => {
 
 export const createCPL = async (req, res) => {
     try {
-        const { prodi_id } = req.user;
+        const { prodi_id: userProdiId } = req.user;
         const level = req.body.level || 'prodi';
 
-        // Get prodi prefix for internal code
-        const prefix = await getProdiPrefix(prodi_id);
+        // Resolve IDs based on level
+        let orgIds = {
+            prodi_id: level === 'prodi' ? (req.body.prodi_id || userProdiId) : null,
+            fakultas_id: level === 'fakultas' ? req.body.fakultas_id : null,
+            institusi_id: level === 'institusi' ? req.body.institusi_id : null
+        };
 
-        // kode_tampilan is the user-provided display code (e.g., CPL01)
+        // If institusi level and no id provided, try to find default
+        if (level === 'institusi' && !orgIds.institusi_id) {
+            const inst = await Institusi.findOne();
+            if (inst) orgIds.institusi_id = inst.id;
+        }
+
+        // Get prefix for internal code
+        const targetProdiId = orgIds.prodi_id || userProdiId;
+        const prefix = await getProdiPrefix(targetProdiId);
+
         let kodeTampilan = req.body.kode_tampilan || req.body.kode_cpl;
+        kodeTampilan = await getUniqueCode(CPL, 'kode_tampilan', kodeTampilan, orgIds.prodi_id);
 
-        // Check for duplicate and add suffix if needed
-        kodeTampilan = await getUniqueCode(CPL, 'kode_tampilan', kodeTampilan, prodi_id);
-
-        // Internal code: manually provided OR auto-generated
         let kodeInternal = req.body.kode_cpl || `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}`;
-        kodeInternal = await getUniqueCode(CPL, 'kode_cpl', kodeInternal, prodi_id);
+        kodeInternal = await getUniqueCode(CPL, 'kode_cpl', kodeInternal, orgIds.prodi_id);
 
         const cplData = {
+            ...orgIds,
             kode_cpl: kodeInternal,
             kode_tampilan: kodeTampilan,
             deskripsi: req.body.deskripsi,
             kategori: req.body.kategori,
             keterangan: req.body.keterangan,
-            level: level,
-            institusi_id: null,
-            fakultas_id: null,
-            prodi_id: prodi_id
+            level: level
         };
 
         const cpl = await CPL.create(cplData);
@@ -133,21 +141,35 @@ export const updateCPL = async (req, res) => {
         const cpl = await CPL.findByPk(id);
         if (!cpl) return res.status(404).json({ message: 'CPL not found' });
 
-        const prodi_id = req.body.prodi_id || cpl.prodi_id;
-        const prefix = await getProdiPrefix(prodi_id);
+        const level = req.body.level || cpl.level;
+
+        // Resolve IDs based on level
+        let orgIds = {
+            prodi_id: level === 'prodi' ? (req.body.prodi_id || cpl.prodi_id) : null,
+            fakultas_id: level === 'fakultas' ? (req.body.fakultas_id || cpl.fakultas_id) : null,
+            institusi_id: level === 'institusi' ? (req.body.institusi_id || cpl.institusi_id) : null
+        };
+
+        if (level === 'institusi' && !orgIds.institusi_id) {
+            const inst = await Institusi.findOne();
+            if (inst) orgIds.institusi_id = inst.id;
+        }
+
+        const targetProdiId = orgIds.prodi_id || req.user.prodi_id;
+        const prefix = await getProdiPrefix(targetProdiId);
 
         let kodeTampilan = req.body.kode_tampilan || cpl.kode_tampilan;
-        kodeTampilan = await getUniqueCode(CPL, 'kode_tampilan', kodeTampilan, prodi_id, id);
+        kodeTampilan = await getUniqueCode(CPL, 'kode_tampilan', kodeTampilan, orgIds.prodi_id, id);
 
-        // Allow manual internal code update
-        let kodeInternal = req.body.kode_cpl || `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}`;
-        kodeInternal = await getUniqueCode(CPL, 'kode_cpl', kodeInternal, prodi_id, id);
+        let kodeInternal = req.body.kode_cpl || (req.body.kode_tampilan ? `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}` : cpl.kode_cpl);
+        kodeInternal = await getUniqueCode(CPL, 'kode_cpl', kodeInternal, orgIds.prodi_id, id);
 
         await cpl.update({
             ...req.body,
+            ...orgIds,
             kode_cpl: kodeInternal,
             kode_tampilan: kodeTampilan,
-            prodi_id
+            level
         });
         res.json(cpl);
     } catch (error) {
@@ -306,26 +328,36 @@ export const getBahanKajian = async (req, res) => {
 
 export const createBahanKajian = async (req, res) => {
     try {
-        const { prodi_id } = req.user;
+        const { prodi_id: userProdiId } = req.user;
+        const level = req.body.level || 'prodi';
 
-        // Get prodi prefix
-        const prefix = await getProdiPrefix(prodi_id);
+        // Resolve IDs based on level
+        let orgIds = {
+            prodi_id: level === 'prodi' ? (req.body.prodi_id || userProdiId) : null,
+            fakultas_id: level === 'fakultas' ? req.body.fakultas_id : null,
+            institusi_id: level === 'institusi' ? req.body.institusi_id : null
+        };
 
-        // Display code from user input
+        if (level === 'institusi' && !orgIds.institusi_id) {
+            const inst = await Institusi.findOne();
+            if (inst) orgIds.institusi_id = inst.id;
+        }
+
+        const targetProdiId = orgIds.prodi_id || userProdiId;
+        const prefix = await getProdiPrefix(targetProdiId);
+
         let kodeTampilan = req.body.kode_tampilan || req.body.kode_bk;
+        kodeTampilan = await getUniqueCode(BahanKajian, 'kode_tampilan', kodeTampilan, orgIds.prodi_id);
 
-        // Check for duplicate and add suffix if needed
-        kodeTampilan = await getUniqueCode(BahanKajian, 'kode_tampilan', kodeTampilan, prodi_id);
-
-        // Internal code: manual OR auto
         let kodeInternal = req.body.kode_bk || `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}`;
-        kodeInternal = await getUniqueCode(BahanKajian, 'kode_bk', kodeInternal, prodi_id);
+        kodeInternal = await getUniqueCode(BahanKajian, 'kode_bk', kodeInternal, orgIds.prodi_id);
 
         const bk = await BahanKajian.create({
             ...req.body,
+            ...orgIds,
             kode_bk: kodeInternal,
             kode_tampilan: kodeTampilan,
-            prodi_id
+            level
         });
         res.status(201).json(bk);
     } catch (error) {
@@ -340,21 +372,35 @@ export const updateBahanKajian = async (req, res) => {
         const bk = await BahanKajian.findByPk(id);
         if (!bk) return res.status(404).json({ message: 'Bahan Kajian not found' });
 
-        const prodi_id = req.body.prodi_id || bk.prodi_id;
-        const prefix = await getProdiPrefix(prodi_id);
+        const level = req.body.level || bk.level;
+
+        // Resolve IDs based on level
+        let orgIds = {
+            prodi_id: level === 'prodi' ? (req.body.prodi_id || bk.prodi_id) : null,
+            fakultas_id: level === 'fakultas' ? (req.body.fakultas_id || bk.fakultas_id) : null,
+            institusi_id: level === 'institusi' ? (req.body.institusi_id || bk.institusi_id) : null
+        };
+
+        if (level === 'institusi' && !orgIds.institusi_id) {
+            const inst = await Institusi.findOne();
+            if (inst) orgIds.institusi_id = inst.id;
+        }
+
+        const targetProdiId = orgIds.prodi_id || req.user.prodi_id;
+        const prefix = await getProdiPrefix(targetProdiId);
 
         let kodeTampilan = req.body.kode_tampilan || bk.kode_tampilan;
-        kodeTampilan = await getUniqueCode(BahanKajian, 'kode_tampilan', kodeTampilan, prodi_id, id);
+        kodeTampilan = await getUniqueCode(BahanKajian, 'kode_tampilan', kodeTampilan, orgIds.prodi_id, id);
 
-        // Internal code: manual OR auto
-        let kodeInternal = req.body.kode_bk || `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}`;
-        kodeInternal = await getUniqueCode(BahanKajian, 'kode_bk', kodeInternal, prodi_id, id);
+        let kodeInternal = req.body.kode_bk || (req.body.kode_tampilan ? `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}` : bk.kode_bk);
+        kodeInternal = await getUniqueCode(BahanKajian, 'kode_bk', kodeInternal, orgIds.prodi_id, id);
 
         await bk.update({
             ...req.body,
+            ...orgIds,
             kode_bk: kodeInternal,
             kode_tampilan: kodeTampilan,
-            prodi_id
+            level
         });
         res.json(bk);
     } catch (error) {
@@ -651,32 +697,41 @@ export const getCPMKs = async (req, res) => {
 
 export const createCPMK = async (req, res) => {
     try {
-        const { prodi_id } = req.user;
+        const { prodi_id: userProdiId } = req.user;
+        const level = req.body.level || 'prodi';
 
-        // Get prodi prefix
-        const prefix = await getProdiPrefix(prodi_id);
+        // Resolve IDs based on level
+        let orgIds = {
+            prodi_id: level === 'prodi' ? (req.body.prodi_id || userProdiId) : null,
+            fakultas_id: level === 'fakultas' ? req.body.fakultas_id : null,
+            institusi_id: level === 'institusi' ? req.body.institusi_id : null
+        };
 
-        // Display code from user input
+        if (level === 'institusi' && !orgIds.institusi_id) {
+            const inst = await Institusi.findOne();
+            if (inst) orgIds.institusi_id = inst.id;
+        }
+
+        const targetProdiId = orgIds.prodi_id || userProdiId;
+        const prefix = await getProdiPrefix(targetProdiId);
+
         let kodeTampilan = req.body.kode_tampilan || req.body.kode_cpmk;
+        kodeTampilan = await getUniqueCode(CPMK, 'kode_tampilan', kodeTampilan, orgIds.prodi_id);
 
-        // Check for duplicate and add suffix if needed
-        kodeTampilan = await getUniqueCode(CPMK, 'kode_tampilan', kodeTampilan, prodi_id);
-
-        // Internal code: manual OR auto
         let kodeInternal = req.body.kode_cpmk || `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}`;
-        kodeInternal = await getUniqueCode(CPMK, 'kode_cpmk', kodeInternal, prodi_id);
+        kodeInternal = await getUniqueCode(CPMK, 'kode_cpmk', kodeInternal, orgIds.prodi_id);
 
-        // Sanitize foreign keys: convert "" to null
         const cpl_id = req.body.cpl_id === '' ? null : req.body.cpl_id;
         const mk_id = req.body.mata_kuliah_id === '' ? null : req.body.mata_kuliah_id;
 
         const cpmk = await CPMK.create({
             ...req.body,
+            ...orgIds,
             cpl_id,
             mata_kuliah_id: mk_id,
             kode_cpmk: kodeInternal,
             kode_tampilan: kodeTampilan,
-            prodi_id
+            level
         });
         res.status(201).json(cpmk);
     } catch (error) {
@@ -691,27 +746,40 @@ export const updateCPMK = async (req, res) => {
         const cpmk = await CPMK.findByPk(id);
         if (!cpmk) return res.status(404).json({ message: 'CPMK not found' });
 
-        const prodi_id = req.body.prodi_id || cpmk.prodi_id;
-        const prefix = await getProdiPrefix(prodi_id);
+        const level = req.body.level || cpmk.level;
+
+        // Resolve IDs based on level
+        let orgIds = {
+            prodi_id: level === 'prodi' ? (req.body.prodi_id || cpmk.prodi_id) : null,
+            fakultas_id: level === 'fakultas' ? (req.body.fakultas_id || cpmk.fakultas_id) : null,
+            institusi_id: level === 'institusi' ? (req.body.institusi_id || cpmk.institusi_id) : null
+        };
+
+        if (level === 'institusi' && !orgIds.institusi_id) {
+            const inst = await Institusi.findOne();
+            if (inst) orgIds.institusi_id = inst.id;
+        }
+
+        const targetProdiId = orgIds.prodi_id || req.user.prodi_id;
+        const prefix = await getProdiPrefix(targetProdiId);
 
         let kodeTampilan = req.body.kode_tampilan || cpmk.kode_tampilan;
-        kodeTampilan = await getUniqueCode(CPMK, 'kode_tampilan', kodeTampilan, prodi_id, id);
+        kodeTampilan = await getUniqueCode(CPMK, 'kode_tampilan', kodeTampilan, orgIds.prodi_id, id);
 
-        // Internal code: manual OR auto
-        let kodeInternal = req.body.kode_cpmk || `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}`;
-        kodeInternal = await getUniqueCode(CPMK, 'kode_cpmk', kodeInternal, prodi_id, id);
+        let kodeInternal = req.body.kode_cpmk || (req.body.kode_tampilan ? `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}` : cpmk.kode_cpmk);
+        kodeInternal = await getUniqueCode(CPMK, 'kode_cpmk', kodeInternal, orgIds.prodi_id, id);
 
-        // Sanitize foreign keys
         const cpl_id = req.body.cpl_id === '' ? null : (req.body.cpl_id || cpmk.cpl_id);
         const mk_id = req.body.mata_kuliah_id === '' ? null : (req.body.mata_kuliah_id || cpmk.mata_kuliah_id);
 
         await cpmk.update({
             ...req.body,
+            ...orgIds,
             cpl_id,
             mata_kuliah_id: mk_id,
             kode_cpmk: kodeInternal,
             kode_tampilan: kodeTampilan,
-            prodi_id
+            level
         });
         res.json(cpmk);
     } catch (error) {
@@ -870,8 +938,7 @@ export const importSubCPMK = async (req, res) => {
 
 export const getSubCPMKs = async (req, res) => {
     try {
-        const { prodi_id, role } = req.user;
-        const whereClause = role === 'super_admin' ? {} : { prodi_id };
+        const whereClause = { ...req.dataScope };
 
         const subs = await SubCPMK.findAll({
             where: whereClause,
@@ -891,30 +958,39 @@ export const getSubCPMKs = async (req, res) => {
 
 export const createSubCPMK = async (req, res) => {
     try {
-        const { prodi_id } = req.user;
+        const { prodi_id: userProdiId } = req.user;
+        const level = req.body.level || 'prodi';
 
-        // Get prodi prefix
-        const prefix = await getProdiPrefix(prodi_id);
+        // Resolve IDs based on level
+        let orgIds = {
+            prodi_id: level === 'prodi' ? (req.body.prodi_id || userProdiId) : null,
+            fakultas_id: level === 'fakultas' ? req.body.fakultas_id : null,
+            institusi_id: level === 'institusi' ? req.body.institusi_id : null
+        };
 
-        // Display code from user input
+        if (level === 'institusi' && !orgIds.institusi_id) {
+            const inst = await Institusi.findOne();
+            if (inst) orgIds.institusi_id = inst.id;
+        }
+
+        const targetProdiId = orgIds.prodi_id || userProdiId;
+        const prefix = await getProdiPrefix(targetProdiId);
+
         let kodeTampilan = req.body.kode_tampilan || req.body.kode_sub_cpmk;
+        kodeTampilan = await getUniqueCode(SubCPMK, 'kode_tampilan', kodeTampilan, orgIds.prodi_id);
 
-        // Check for duplicate and add suffix if needed
-        kodeTampilan = await getUniqueCode(SubCPMK, 'kode_tampilan', kodeTampilan, prodi_id);
-
-        // Internal code: manual OR auto
         let kodeInternal = req.body.kode_sub_cpmk || `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}`;
-        kodeInternal = await getUniqueCode(SubCPMK, 'kode_sub_cpmk', kodeInternal, prodi_id);
+        kodeInternal = await getUniqueCode(SubCPMK, 'kode_sub_cpmk', kodeInternal, orgIds.prodi_id);
 
-        // Sanitize cpmk_id
         const cpmk_id = req.body.cpmk_id === '' ? null : req.body.cpmk_id;
 
         const sub = await SubCPMK.create({
             ...req.body,
+            ...orgIds,
             cpmk_id,
             kode_sub_cpmk: kodeInternal,
             kode_tampilan: kodeTampilan,
-            prodi_id
+            level
         });
         res.status(201).json(sub);
     } catch (error) {
@@ -929,25 +1005,38 @@ export const updateSubCPMK = async (req, res) => {
         const sub = await SubCPMK.findByPk(id);
         if (!sub) return res.status(404).json({ message: 'Sub-CPMK not found' });
 
-        const prodi_id = req.body.prodi_id || sub.prodi_id;
-        const prefix = await getProdiPrefix(prodi_id);
+        const level = req.body.level || sub.level;
+
+        // Resolve IDs based on level
+        let orgIds = {
+            prodi_id: level === 'prodi' ? (req.body.prodi_id || sub.prodi_id) : null,
+            fakultas_id: level === 'fakultas' ? (req.body.fakultas_id || sub.fakultas_id) : null,
+            institusi_id: level === 'institusi' ? (req.body.institusi_id || sub.institusi_id) : null
+        };
+
+        if (level === 'institusi' && !orgIds.institusi_id) {
+            const inst = await Institusi.findOne();
+            if (inst) orgIds.institusi_id = inst.id;
+        }
+
+        const targetProdiId = orgIds.prodi_id || req.user.prodi_id;
+        const prefix = await getProdiPrefix(targetProdiId);
 
         let kodeTampilan = req.body.kode_tampilan || sub.kode_tampilan;
-        kodeTampilan = await getUniqueCode(SubCPMK, 'kode_tampilan', kodeTampilan, prodi_id, id);
+        kodeTampilan = await getUniqueCode(SubCPMK, 'kode_tampilan', kodeTampilan, orgIds.prodi_id, id);
 
-        // Internal code: manual OR auto
-        let kodeInternal = req.body.kode_sub_cpmk || `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}`;
-        kodeInternal = await getUniqueCode(SubCPMK, 'kode_sub_cpmk', kodeInternal, prodi_id, id);
+        let kodeInternal = req.body.kode_sub_cpmk || (req.body.kode_tampilan ? `${prefix}-${kodeTampilan.replace(/^[A-Z]+-/, '')}` : sub.kode_sub_cpmk);
+        kodeInternal = await getUniqueCode(SubCPMK, 'kode_sub_cpmk', kodeInternal, orgIds.prodi_id, id);
 
-        // Sanitize cpmk_id
         const cpmk_id = req.body.cpmk_id === '' ? null : (req.body.cpmk_id || sub.cpmk_id);
 
         await sub.update({
             ...req.body,
+            ...orgIds,
             cpmk_id,
             kode_sub_cpmk: kodeInternal,
             kode_tampilan: kodeTampilan,
-            prodi_id
+            level
         });
         res.json(sub);
     } catch (error) {

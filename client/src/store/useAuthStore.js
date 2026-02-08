@@ -119,7 +119,7 @@ const useAuthStore = create(
             isDekan: () => (get().activeRole || get().user?.role) === 'dekan',
             isKaprodi: () => (get().activeRole || get().user?.role) === 'kaprodi',
             isDosen: () => (get().activeRole || get().user?.role) === 'dosen',
-            isMahasiswa: () => (get().activeRole || get().user?.role) === 'mahasiswa',
+            isQA: () => (get().activeRole || get().user?.role) === 'penjaminan_mutu',
 
             // Check if user can switch roles
             canSwitchRoles: () => {
@@ -149,7 +149,7 @@ const useAuthStore = create(
 
             canApproveRPS: () => {
                 const role = get().activeRole || get().user?.role;
-                return role === 'kaprodi' || role === 'dekan' || role === 'superadmin' || role === 'admin';
+                return ['kaprodi', 'dekan', 'penjaminan_mutu', 'superadmin', 'admin'].includes(role);
             },
 
             // Hydration state

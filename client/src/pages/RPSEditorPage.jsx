@@ -18,6 +18,31 @@ export default function RPSEditorPage() {
     const [lastSaved, setLastSaved] = useState(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false); // State for dropdown
     const dropdownRef = useRef(null); // Ref for click outside
+    const [users, setUsers] = useState([]); // All users for search
+    const [deans, setDeans] = useState([]); // Deans list
+    const [fetchedUsers, setFetchedUsers] = useState(false);
+
+    useEffect(() => {
+        const fetchUsers = async () => {
+            if (fetchedUsers) return;
+            try {
+                // Fetch all lecturers and deans
+                const [dosensRes, dekansRes] = await Promise.all([
+                    axios.get('/users?role=dosen'),
+                    axios.get('/users?role=dekan') // Assuming we can filter by role, or filter client side if not
+                ]);
+
+                // If the API supports role filter, great. If not, we might get all and filter locally.
+                // Based on userManagementController, it supports role query.
+                setUsers(dosensRes.data);
+                setDeans(dekansRes.data);
+                setFetchedUsers(true);
+            } catch (error) {
+                console.error('Failed to fetch users for autocomplete:', error);
+            }
+        };
+        fetchUsers();
+    }, [fetchedUsers]);
 
     // Constants for selection
     const teknikPenilaian = [
@@ -82,6 +107,7 @@ export default function RPSEditorPage() {
     });
 
     const [dosen_pengampu_list, setDosenPengampuList] = useState([]);
+    const [dosenInput, setDosenInput] = useState('');
 
     // Rumpun MK options with add-new capability
     const [rumpunOptions, setRumpunOptions] = useState([
@@ -150,10 +176,7 @@ export default function RPSEditorPage() {
                     rows,
                     selectedCPLs,
                     selectedCPMKs,
-                    selectedCPMKs,
-                    selectedCPMKs,
                     definedSubCPMKs, // Now includes estimasi_minggu and acts as ordered list
-                    metodePenilaian,
                     metodePenilaian,
                     dosen_pengampu_list,
                     updatedAt: new Date().toISOString()
@@ -316,7 +339,14 @@ export default function RPSEditorPage() {
             // Auto-populate Dosen from Course Assignments
             if (course.assignments && Array.isArray(course.assignments)) {
                 const dosenNames = course.assignments.map(a => a.dosen?.nama_lengkap).filter(Boolean);
-                if (dosenNames.length > 0) setDosenPengampuList(dosenNames);
+                if (dosenNames.length > 0) {
+                    setDosenPengampuList(dosenNames);
+                    // Also set first lecturer as developer
+                    setFormData(prev => ({
+                        ...prev,
+                        pengembang_rps: dosenNames[0]
+                    }));
+                }
             }
 
             if (course.prodi_id) {
@@ -360,7 +390,9 @@ export default function RPSEditorPage() {
                 sks: rps.MataKuliah?.sks || '',
                 pengembang_rps: rps.pengembang_rps || user?.nama_lengkap || '',
                 koordinator_rumpun_mk: rps.koordinator_rumpun_mk || '',
-                ketua_prodi: rps.ketua_prodi || '',
+                ketua_prodi: rps.ketua_prodi || (user?.role === 'kaprodi' ? user.nama_lengkap : ''),
+                dekan: rps.dekan || '',
+                penjaminan_mutu: rps.penjaminan_mutu || '',
                 pustaka_utama: rps.pustaka_utama || '',
                 pustaka_pendukung: rps.pustaka_pendukung || '',
                 media_software: rps.media_software || '',
@@ -1261,22 +1293,69 @@ export default function RPSEditorPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="label text-xs font-bold uppercase text-gray-400">Pengembang RPS (Dosen)</label>
-                                        <input type="text" value={formData.pengembang_rps} onChange={e => setFormData({ ...formData, pengembang_rps: e.target.value })} className="input w-full" />
+                                {/* Otorisasi / Pengesahan Section - Moved to Top */}
+                                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                                    <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2 mb-6">
+                                        <CheckCircle className="text-teal-500" size={20} />
+                                        Otorisasi / Pengesahan
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="label text-xs font-bold uppercase text-gray-400">Pengembang RPS (Dosen)</label>
+                                            <input
+                                                type="text"
+                                                list="lecturer-list"
+                                                value={formData.pengembang_rps}
+                                                onChange={e => setFormData({ ...formData, pengembang_rps: e.target.value })}
+                                                className="input w-full"
+                                                placeholder="Cari nama dosen..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label text-xs font-bold uppercase text-gray-400">Koordinator Rumpun MK</label>
+                                            <input
+                                                type="text"
+                                                list="lecturer-list"
+                                                value={formData.koordinator_rumpun_mk}
+                                                onChange={e => setFormData({ ...formData, koordinator_rumpun_mk: e.target.value })}
+                                                className="input w-full"
+                                                placeholder="Cari nama Koordinator Rumpun..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label text-xs font-bold uppercase text-gray-400">Ketua Program Studi</label>
+                                            <input
+                                                type="text"
+                                                list="lecturer-list"
+                                                value={formData.ketua_prodi}
+                                                onChange={e => setFormData({ ...formData, ketua_prodi: e.target.value })}
+                                                className="input w-full"
+                                                placeholder="Cari nama Kaprodi..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label text-xs font-bold uppercase text-gray-400">Dekan</label>
+                                            <input
+                                                type="text"
+                                                list="dean-list"
+                                                value={formData.dekan}
+                                                onChange={e => setFormData({ ...formData, dekan: e.target.value })}
+                                                className="input w-full"
+                                                placeholder="Cari nama Dekan..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label text-xs font-bold uppercase text-gray-400">Penjaminan Mutu</label>
+                                            <input
+                                                type="text"
+                                                list="lecturer-list"
+                                                value={formData.penjaminan_mutu}
+                                                onChange={e => setFormData({ ...formData, penjaminan_mutu: e.target.value })}
+                                                className="input w-full"
+                                                placeholder="Cari Penjaminan Mutu..."
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="label text-xs font-bold uppercase text-gray-400">Koordinator Rumpun MK</label>
-                                        <input type="text" value={formData.koordinator_rumpun_mk} onChange={e => setFormData({ ...formData, koordinator_rumpun_mk: e.target.value })} className="input w-full" placeholder="Nama Koordinator Rumpun..." />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="label text-xs font-bold uppercase text-gray-400">Ketua Program Studi</label>
-                                        <input type="text" value={formData.ketua_prodi} onChange={e => setFormData({ ...formData, ketua_prodi: e.target.value })} className="input w-full" />
-                                    </div>
-                                    <div className="hidden md:block"></div>
                                 </div>
                                 <div>
                                     <label className="label text-xs font-bold uppercase text-gray-400">Deskripsi Mata Kuliah</label>
@@ -1300,33 +1379,41 @@ export default function RPSEditorPage() {
                                             <div className="flex gap-2 mb-3">
                                                 <input
                                                     type="text"
-                                                    id="new-dosen-input"
-                                                    className="input input-sm flex-1"
-                                                    placeholder="Nama Dosen..."
+                                                    list="lecturer-list"
+                                                    value={dosenInput}
+                                                    onChange={(e) => setDosenInput(e.target.value)}
+                                                    className={`input input-sm flex-1 ${dosen_pengampu_list.length >= 2 ? 'input-disabled bg-gray-100' : ''}`}
+                                                    placeholder={dosen_pengampu_list.length >= 2 ? "Maksimal 2 dosen tercapai" : "Cari nama Dosen..."}
+                                                    disabled={dosen_pengampu_list.length >= 2}
                                                     onKeyDown={e => {
                                                         if (e.key === 'Enter') {
-                                                            const val = e.target.value.trim();
-                                                            if (val) {
+                                                            const val = dosenInput.trim();
+                                                            if (val && dosen_pengampu_list.length < 2 && !dosen_pengampu_list.includes(val)) {
                                                                 setDosenPengampuList([...dosen_pengampu_list, val]);
-                                                                e.target.value = '';
+                                                                setDosenInput('');
                                                             }
                                                         }
                                                     }}
                                                 />
                                                 <button
                                                     onClick={() => {
-                                                        const input = document.getElementById('new-dosen-input');
-                                                        const val = input.value.trim();
-                                                        if (val) {
+                                                        const val = dosenInput.trim();
+                                                        if (val && dosen_pengampu_list.length < 2 && !dosen_pengampu_list.includes(val)) {
                                                             setDosenPengampuList([...dosen_pengampu_list, val]);
-                                                            input.value = '';
+                                                            setDosenInput('');
                                                         }
                                                     }}
                                                     className="btn btn-sm btn-primary"
+                                                    disabled={dosen_pengampu_list.length >= 2 || !dosenInput.trim()}
                                                 >
-                                                    Tambah
+                                                    <Plus size={16} />
                                                 </button>
                                             </div>
+                                            {dosen_pengampu_list.length >= 2 && (
+                                                <p className="text-xs text-orange-500 mb-2 flex items-center gap-1">
+                                                    <AlertCircle size={12} /> Batas maksimal 2 dosen pengampu tercapai.
+                                                </p>
+                                            )}
                                             <div className="flex flex-wrap gap-2">
                                                 {dosen_pengampu_list.map((d, i) => (
                                                     <div key={i} className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full text-sm flex items-center gap-2 border border-gray-200 dark:border-gray-600">
@@ -2475,8 +2562,28 @@ export default function RPSEditorPage() {
 
                     {/* Section: Info Tambahan */}
 
+
                 </div>
             </div>
+
+            {/* Datalists for Autocomplete */}
+            <datalist id="lecturer-list">
+                {users.map(u => (
+                    <option key={u.id} value={u.nama_lengkap} />
+                ))}
+            </datalist>
+            <datalist id="dean-list">
+                {deans.length > 0 ? (
+                    deans.map(u => (
+                        <option key={u.id} value={u.nama_lengkap} />
+                    ))
+                ) : (
+                    // Fallback to all users if no deans found separated
+                    users.map(u => (
+                        <option key={u.id} value={u.nama_lengkap} />
+                    ))
+                )}
+            </datalist>
 
             {/* Footer Actions */}
             <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t p-4 z-40 flex items-center justify-between shadow-lg lg:pl-64 font-sans">

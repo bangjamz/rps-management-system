@@ -7,7 +7,9 @@ import useAuthStore from '../store/useAuthStore';
 export const ROLES = {
     KAPRODI: 'kaprodi',
     DOSEN: 'dosen',
-    MAHASISWA: 'mahasiswa'
+    MAHASISWA: 'mahasiswa',
+    DEKAN: 'dekan',
+    QA: 'penjaminan_mutu' // Quality Assurance
 };
 
 export const PERMISSIONS = {
@@ -84,6 +86,34 @@ const rolePermissions = {
         // System management
         PERMISSIONS.MANAGE_USERS,
         PERMISSIONS.MANAGE_PRODI,
+    ],
+
+    [ROLES.DEKAN]: [
+        // Read-only curriculum
+        PERMISSIONS.CPL_READ,
+        PERMISSIONS.CPMK_READ,
+        PERMISSIONS.SUB_CPMK_READ,
+
+        // RPS: Read & Approve
+        PERMISSIONS.RPS_READ,
+        PERMISSIONS.RPS_APPROVE,
+        PERMISSIONS.RPS_EXPORT_PDF,
+
+        // Grade: View & Export
+        PERMISSIONS.GRADE_VIEW,
+        PERMISSIONS.GRADE_EXPORT,
+    ],
+
+    [ROLES.QA]: [
+        // Read-only curriculum
+        PERMISSIONS.CPL_READ,
+        PERMISSIONS.CPMK_READ,
+        PERMISSIONS.SUB_CPMK_READ,
+
+        // RPS: Read & Approve
+        PERMISSIONS.RPS_READ,
+        PERMISSIONS.RPS_APPROVE,
+        PERMISSIONS.RPS_EXPORT_PDF,
     ],
 
     [ROLES.DOSEN]: [

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Search, Filter, Eye, CheckCircle, XCircle, Clock, FileCheck } from 'lucide-react';
+import { FileText, Search, Filter, Eye, CheckCircle, XCircle, Clock, FileCheck, Printer, Check, X, Edit, RotateCcw } from 'lucide-react';
 import axios from '../lib/axios';
 import toast from 'react-hot-toast';
 import useAuthStore from '../store/useAuthStore';
@@ -123,7 +123,8 @@ export default function RPSManagementPage() {
             return (
                 rps.mata_kuliah?.nama_mk.toLowerCase().includes(search) ||
                 rps.mata_kuliah?.kode_mk.toLowerCase().includes(search) ||
-                rps.dosen?.nama_lengkap.toLowerCase().includes(search)
+                rps.dosen?.nama_lengkap.toLowerCase().includes(search) ||
+                (rps.pengembang_rps && rps.pengembang_rps.toLowerCase().includes(search))
             );
         }
         return true;
@@ -271,7 +272,14 @@ export default function RPSManagementPage() {
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="text-sm">
-                                            <div className="font-medium text-gray-900 dark:text-gray-200">{rps.dosen?.nama_lengkap}</div>
+                                            <div className="font-medium text-gray-900 dark:text-gray-200">
+                                                {rps.pengembang_rps || rps.dosen?.nama_lengkap || '-'}
+                                            </div>
+                                            {rps.pengembang_rps && rps.dosen?.nama_lengkap && rps.pengembang_rps !== rps.dosen.nama_lengkap && (
+                                                <div className="text-xs text-gray-400 dark:text-gray-500 italic">
+                                                    Dibuat oleh: {rps.dosen.nama_lengkap}
+                                                </div>
+                                            )}
                                             <div className="text-gray-500 dark:text-gray-400">{rps.dosen?.nidn}</div>
                                         </div>
                                     </td>
@@ -288,26 +296,26 @@ export default function RPSManagementPage() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center justify-end gap-2">
                                             <button
-                                                onClick={() => handlePrintRPS(rps.id)}
-                                                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 text-sm font-medium flex items-center gap-1"
-                                                title="Download PDF"
+                                                onClick={() => exportRPSToPDF(rps)}
+                                                className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                title="Cetak/PDF"
                                             >
-                                                <FileText className="w-4 h-4" />
+                                                <Printer className="w-4.5 h-4.5" />
                                             </button>
                                             <button
                                                 onClick={() => window.location.href = `/kaprodi/rps/view/${rps.id}`}
-                                                className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                                                className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                title="Lihat Detail"
                                             >
-                                                <Eye className="w-4 h-4" />
-                                                Lihat
+                                                <Eye className="w-4.5 h-4.5" />
                                             </button>
                                             {rps.status === 'draft' && (
                                                 <button
                                                     onClick={() => window.location.href = `/kaprodi/rps/${rps.id}/edit`}
-                                                    className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center gap-1"
+                                                    className="p-1.5 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                                    title="Edit RPS"
                                                 >
-                                                    <FileCheck className="w-4 h-4" />
-                                                    Edit
+                                                    <Edit className="w-4.5 h-4.5" />
                                                 </button>
                                             )}
                                             {canApproveRPS() && (rps.status === 'pending' || rps.status === 'draft' || rps.status === 'approved') && (
@@ -315,18 +323,18 @@ export default function RPSManagementPage() {
                                                     {rps.status !== 'approved' && (
                                                         <button
                                                             onClick={() => handleOpenApprovalModal(rps, 'approve')}
-                                                            className="text-green-600 hover:text-green-800 dark:hover:text-green-400 text-sm font-medium flex items-center gap-1"
+                                                            className="p-1.5 text-green-600 hover:text-green-900 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                                            title="Setujui RPS"
                                                         >
-                                                            <CheckCircle className="w-4 h-4" />
-                                                            Setujui
+                                                            <Check className="w-4.5 h-4.5" />
                                                         </button>
                                                     )}
                                                     <button
                                                         onClick={() => handleOpenApprovalModal(rps, 'reject')}
-                                                        className="text-red-600 hover:text-red-800 dark:hover:text-red-400 text-sm font-medium flex items-center gap-1"
+                                                        className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                        title={rps.status === 'approved' ? 'Kembalikan ke Draft' : 'Tolak/Revisi'}
                                                     >
-                                                        <XCircle className="w-4 h-4" />
-                                                        {rps.status === 'draft' ? 'Revisi' : (rps.status === 'approved' ? 'Kembalikan ke Draft' : 'Tolak/Revisi')}
+                                                        {rps.status === 'approved' ? <RotateCcw className="w-4.5 h-4.5" /> : <X className="w-4.5 h-4.5" />}
                                                     </button>
                                                 </>
                                             )}

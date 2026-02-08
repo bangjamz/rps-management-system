@@ -71,11 +71,23 @@ export const setActiveAcademicYear = async (req, res) => {
 export const getAllCourses = async (req, res) => {
     try {
         const { MataKuliah } = await import('../models/index.js');
-        // If user is Kaprodi, filter by prodi
+        const { Op } = await import('sequelize');
+
         const where = { is_active: true };
-        if (req.user.role === 'kaprodi') {
-            where.prodi_id = req.user.prodi_id;
+
+        // Align with coursesController logic
+        if (req.user.role === 'kaprodi' || req.user.role === 'dosen') {
+            where[Op.or] = [
+                { prodi_id: req.user.prodi_id },
+                { scope: 'institusi' }
+            ];
+        } else if (req.user.role === 'dekan') {
+            where[Op.or] = [
+                { fakultas_id: req.user.fakultas_id },
+                { scope: 'institusi' }
+            ];
         }
+        // Admin sees all by default due to no filter added to 'where'
 
         const courses = await MataKuliah.findAll({
             where,

@@ -28,7 +28,7 @@ const User = sequelize.define('User', {
         allowNull: false
     },
     role: {
-        type: DataTypes.ENUM('user', 'mahasiswa', 'dosen', 'kaprodi', 'dekan', 'admin', 'superadmin'),
+        type: DataTypes.ENUM('user', 'mahasiswa', 'dosen', 'kaprodi', 'dekan', 'admin', 'superadmin', 'penjaminan_mutu', 'admin_institusi'),
         allowNull: false,
         defaultValue: 'user',
         comment: 'User role hierarchy: user < mahasiswa/dosen < kaprodi < dekan < admin < superadmin'
@@ -134,6 +134,11 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING(255),
         allowNull: true,
         comment: 'URL/Path foto profil'
+    },
+    signature: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: 'URL/Path to user signature image'
     },
     cover_image: {
         type: DataTypes.STRING(255),

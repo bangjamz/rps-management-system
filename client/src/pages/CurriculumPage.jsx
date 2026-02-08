@@ -5,7 +5,7 @@ import Swal from 'sweetalert2';
 import { downloadCSVTemplate, exportToCSV } from '../utils/csvHelper';
 import { hasPermission, PERMISSIONS } from '../utils/permissions';
 import { getTagColor } from '../utils/ui';
-import { Info, List, Table, LayoutGrid, Trash2, Plus, FileDown, FileUp, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Info, List, Table, LayoutGrid, Trash2, Plus, FileDown, FileUp, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Search } from 'lucide-react';
 
 // Prefix Mapping
 const UNIT_PREFIXES = {
@@ -61,6 +61,12 @@ export default function CurriculumPage() {
     const [addMode, setAddMode] = useState('single'); // 'single', 'bulk', 'import'
     const [bulkItems, setBulkItems] = useState([{ kode: '', deskripsi: '', kategori: '' }]);
 
+    // Filter states
+    const [searchTerms, setSearchTerms] = useState({ cpl: '', bk: '', cpmk: '', subCpmk: '' });
+    const [levelFilters, setLevelFilters] = useState({ cpl: '', bk: '', cpmk: '', subCpmk: '' });
+    const [fakultasData, setFakultasData] = useState([]);
+    const [prodiData, setProdiData] = useState([]);
+
     // Sorting states for each tab
     const [sortConfig, setSortConfig] = useState({
         cpl: { field: 'kode_cpl', direction: 'asc' },
@@ -85,7 +91,9 @@ export default function CurriculumPage() {
                 loadCPMK(),
                 loadSubCPMK(),
                 loadMK(),
-                loadBK()
+                loadBK(),
+                loadFakultas(),
+                loadProdi()
             ]);
         } catch (e) {
             console.error("Error loading data", e);
@@ -97,7 +105,8 @@ export default function CurriculumPage() {
     const loadProfile = async () => {
         try {
             const response = await axios.get('/auth/profile');
-            setUserProfile(response.data);
+            // Backend returns { user: { ... } }
+            setUserProfile(response.data.user || response.data);
         } catch (error) { console.error(error); }
     };
 
@@ -146,6 +155,20 @@ export default function CurriculumPage() {
         } catch (error) { console.error(error); }
     };
 
+    const loadFakultas = async () => {
+        try {
+            const response = await axios.get('/organization/fakultas');
+            setFakultasData(response.data);
+        } catch (error) { console.error(error); }
+    };
+
+    const loadProdi = async () => {
+        try {
+            const response = await axios.get('/organization/prodi');
+            setProdiData(response.data);
+        } catch (error) { console.error(error); }
+    };
+
     // --- Batch Actions ---
     const handleSelectAll = (e, data) => {
         if (e.target.checked) {
@@ -161,6 +184,59 @@ export default function CurriculumPage() {
         } else {
             setSelectedItems([...selectedItems, id]);
         }
+    };
+
+    const handleLevelChange = (level) => {
+        const role = userProfile?.role;
+        let updates = { level };
+
+        if (role === 'kaprodi') {
+            if (level === 'institusi') {
+                updates.fakultas_id = null;
+                updates.prodi_id = null;
+            } else if (level === 'fakultas') {
+                updates.fakultas_id = userProfile.fakultas_id;
+                updates.prodi_id = null;
+            } else if (level === 'prodi') {
+                updates.fakultas_id = null;
+                updates.prodi_id = userProfile.prodi_id;
+            }
+        }
+        setFormData({ ...formData, ...updates });
+    };
+
+    const renderUnitSelection = (type) => {
+        const role = userProfile?.role;
+        const data = type === 'fakultas' ? fakultasData : prodiData;
+        const currentId = type === 'fakultas' ? formData.fakultas_id : formData.prodi_id;
+        const label = type === 'fakultas' ? 'Fakultas' : 'Program Studi';
+        const placeholder = type === 'fakultas' ? '-- Pilih Fakultas --' : '-- Pilih Prodi --';
+
+        if (role === 'kaprodi') {
+            const unit = data.find(d => String(d.id) === String(currentId));
+            return (
+                <div className="form-control">
+                    <label className="label"><span className="label-text font-semibold">{label}</span></label>
+                    <div className="input input-bordered input-sm flex items-center bg-gray-100 dark:bg-gray-800 font-medium cursor-not-allowed">
+                        {unit?.nama || '-'}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="form-control">
+                <label className="label"><span className="label-text font-semibold">Pilih {label}</span></label>
+                <select
+                    className={`select select-bordered select-sm w-full ${type === 'fakultas' ? 'border-orange-200' : 'border-blue-200'}`}
+                    value={currentId || ''}
+                    onChange={e => setFormData({ ...formData, [type === 'fakultas' ? 'fakultas_id' : 'prodi_id']: e.target.value })}
+                >
+                    <option value="">{placeholder}</option>
+                    {data.map(d => <option key={d.id} value={d.id}>{d.nama}</option>)}
+                </select>
+            </div>
+        );
     };
 
     const handleBatchDelete = async () => {
@@ -318,14 +394,40 @@ export default function CurriculumPage() {
             const duplicate = checkDuplicate('cpl', displayCode, editingItem?.id);
             if (duplicate && !window.confirm(`Kode CPL "${displayCode}" sudah ada. Tetap simpan? (Sistem akan otomatis menambahkan akhiran angka jika perlu)`)) return;
 
-            if (editingItem) await axios.put(`/curriculum/cpl/${editingItem.id}`, formData);
-            else await axios.post('/curriculum/cpl', formData);
+            // Prepare data with correct org IDs based on level
+            const submitData = { ...formData };
+            if (submitData.level === 'institusi') {
+                submitData.fakultas_id = null;
+                submitData.prodi_id = null;
+            } else if (submitData.level === 'fakultas') {
+                submitData.institusi_id = null;
+                submitData.prodi_id = null;
+            } else if (submitData.level === 'prodi') {
+                submitData.institusi_id = null;
+                submitData.fakultas_id = null;
+            }
+
+            if (editingItem) await axios.put(`/curriculum/cpl/${editingItem.id}`, submitData);
+            else await axios.post('/curriculum/cpl', submitData);
             setShowCPLModal(false); loadCPL();
-        } catch (e) { setMessage({ type: 'error', text: e.message }); }
+            setMessage({ type: 'success', text: 'CPL berhasil disimpan' });
+        } catch (e) { setMessage({ type: 'error', text: e.response?.data?.message || e.message }); }
     };
 
     // CPMK
-    const handleAddCPMK = () => { setEditingItem(null); setFormData({ kode_tampilan: '', deskripsi: '', cpl_id: '' }); setShowCPMKModal(true); };
+    const handleAddCPMK = () => {
+        setEditingItem(null);
+        setFormData({
+            kode_tampilan: '',
+            deskripsi: '',
+            cpl_id: '',
+            level: 'prodi',
+            prodi_id: userProfile?.prodi_id || '',
+            fakultas_id: userProfile?.fakultas_id || '',
+            institusi_id: userProfile?.institusi_id || ''
+        });
+        setShowCPMKModal(true);
+    };
     const handleEditCPMK = (item) => { setEditingItem(item); setFormData({ ...item }); setShowCPMKModal(true); };
     const handleDeleteCPMK = async (id) => {
         if (!window.confirm('Delete?')) return;
@@ -337,14 +439,46 @@ export default function CurriculumPage() {
             const duplicate = checkDuplicate('cpmk', displayCode, editingItem?.id);
             if (duplicate && !window.confirm(`Kode CPMK "${displayCode}" sudah ada. Tetap simpan? (Sistem akan otomatis menambahkan akhiran angka jika perlu)`)) return;
 
-            if (editingItem) await axios.put(`/curriculum/cpmk/${editingItem.id}`, formData);
-            else await axios.post('/curriculum/cpmk', formData);
-            setShowCPMKModal(false); loadCPMK();
-        } catch (e) { setMessage({ type: 'error', text: e.message }); }
+            const submitData = { ...formData };
+
+            // Handle organizational hierarchy
+            if (submitData.level === 'institusi') { submitData.fakultas_id = null; submitData.prodi_id = null; }
+            else if (submitData.level === 'fakultas') { submitData.institusi_id = null; submitData.prodi_id = null; }
+            else if (submitData.level === 'prodi') { submitData.institusi_id = null; submitData.fakultas_id = null; }
+
+            // Sanitize foreign keys - Ensure they are integers or null, avoiding NaN
+            const toIntOrNull = (val) => {
+                const parsed = parseInt(val);
+                return isNaN(parsed) ? null : parsed;
+            };
+            submitData.cpl_id = toIntOrNull(submitData.cpl_id);
+            submitData.mata_kuliah_id = toIntOrNull(submitData.mata_kuliah_id);
+
+            if (editingItem) await axios.put(`/curriculum/cpmk/${editingItem.id}`, submitData);
+            else await axios.post('/curriculum/cpmk', submitData);
+
+            setShowCPMKModal(false);
+            await loadCPMK();
+            setMessage({ type: 'success', text: 'CPMK berhasil disimpan' });
+        } catch (e) { setMessage({ type: 'error', text: e.response?.data?.message || e.message }); }
     };
 
     // Sub-CPMK
-    const handleAddSubCPMK = () => { setEditingItem(null); setFormData({ kode_tampilan: '', deskripsi: '', cpmk_id: '', indikator: '', bobot_nilai: '' }); setShowSubCPMKModal(true); };
+    const handleAddSubCPMK = () => {
+        setEditingItem(null);
+        setFormData({
+            kode_tampilan: '',
+            deskripsi: '',
+            cpmk_id: '',
+            indikator: '',
+            bobot_nilai: '',
+            level: 'prodi',
+            prodi_id: userProfile?.prodi_id || '',
+            fakultas_id: userProfile?.fakultas_id || '',
+            institusi_id: userProfile?.institusi_id || ''
+        });
+        setShowSubCPMKModal(true);
+    };
     const handleEditSubCPMK = (item) => { setEditingItem(item); setFormData({ ...item }); setShowSubCPMKModal(true); };
     const handleDeleteSubCPMK = async (id) => {
         if (!window.confirm('Delete?')) return;
@@ -356,14 +490,40 @@ export default function CurriculumPage() {
             const duplicate = checkDuplicate('sub-cpmk', displayCode, editingItem?.id);
             if (duplicate && !window.confirm(`Kode Sub-CPMK "${displayCode}" sudah ada. Tetap simpan? (Sistem akan otomatis menambahkan akhiran angka jika perlu)`)) return;
 
-            if (editingItem) await axios.put(`/curriculum/sub-cpmk/${editingItem.id}`, formData);
-            else await axios.post('/curriculum/sub-cpmk', formData);
+            const submitData = { ...formData };
+            if (submitData.level === 'institusi') { submitData.fakultas_id = null; submitData.prodi_id = null; }
+            else if (submitData.level === 'fakultas') { submitData.institusi_id = null; submitData.prodi_id = null; }
+            else if (submitData.level === 'prodi') { submitData.institusi_id = null; submitData.fakultas_id = null; }
+
+            const toIntOrNull = (val) => {
+                const parsed = parseInt(val);
+                return isNaN(parsed) ? null : parsed;
+            };
+            submitData.cpmk_id = toIntOrNull(submitData.cpmk_id);
+
+            if (editingItem) await axios.put(`/curriculum/sub-cpmk/${editingItem.id}`, submitData);
+            else await axios.post('/curriculum/sub-cpmk', submitData);
             setShowSubCPMKModal(false); loadSubCPMK();
-        } catch (e) { setMessage({ type: 'error', text: e.message }); }
+            setMessage({ type: 'success', text: 'Sub-CPMK berhasil disimpan' });
+        } catch (e) { setMessage({ type: 'error', text: e.response?.data?.message || e.message }); }
     };
 
     // BK Handlers
-    const handleAddBK = () => { setEditingItem(null); setFormData({ kode_tampilan: '', deskripsi: '', jenis: '', bobot_min: '', bobot_max: '' }); setShowBKModal(true); };
+    const handleAddBK = () => {
+        setEditingItem(null);
+        setFormData({
+            kode_tampilan: '',
+            deskripsi: '',
+            jenis: '',
+            bobot_min: '',
+            bobot_max: '',
+            level: 'prodi',
+            prodi_id: userProfile?.prodi_id || '',
+            fakultas_id: userProfile?.fakultas_id || '',
+            institusi_id: userProfile?.institusi_id || ''
+        });
+        setShowBKModal(true);
+    };
     const handleEditBK = (item) => { setEditingItem(item); setFormData({ ...item }); setShowBKModal(true); };
     const handleDeleteBK = async (id) => {
         if (!window.confirm('Hapus Bahan Kajian ini?')) return;
@@ -375,11 +535,16 @@ export default function CurriculumPage() {
             const duplicate = checkDuplicate('bk', displayCode, editingItem?.id);
             if (duplicate && !window.confirm(`Kode Bahan Kajian "${displayCode}" sudah ada. Tetap simpan? (Sistem akan otomatis menambahkan akhiran angka jika perlu)`)) return;
 
-            if (editingItem) await axios.put(`/curriculum/bahan-kajian/${editingItem.id}`, formData);
-            else await axios.post('/curriculum/bahan-kajian', formData);
+            const submitData = { ...formData };
+            if (submitData.level === 'institusi') { submitData.fakultas_id = null; submitData.prodi_id = null; }
+            else if (submitData.level === 'fakultas') { submitData.institusi_id = null; submitData.prodi_id = null; }
+            else if (submitData.level === 'prodi') { submitData.institusi_id = null; submitData.fakultas_id = null; }
+
+            if (editingItem) await axios.put(`/curriculum/bahan-kajian/${editingItem.id}`, submitData);
+            else await axios.post('/curriculum/bahan-kajian', submitData);
             setShowBKModal(false); loadBK();
             setMessage({ type: 'success', text: 'Bahan Kajian berhasil disimpan' });
-        } catch (e) { setMessage({ type: 'error', text: e.message }); }
+        } catch (e) { setMessage({ type: 'error', text: e.response?.data?.message || e.message }); }
     };
 
     // Import
@@ -602,9 +767,35 @@ export default function CurriculumPage() {
                         {/* CPL CONTENT */}
                         {activeTab === 'cpl' && (
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                                    <div className="text-sm font-medium text-gray-500">Manajemen Data CPL</div>
-                                    <div className="relative">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                                    <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto flex-1">
+                                        <div className="relative flex-1 max-w-md">
+                                            <input
+                                                type="text"
+                                                placeholder="Cari CPL..."
+                                                className="input input-bordered input-sm w-full pl-8"
+                                                value={searchTerms.cpl}
+                                                onChange={e => setSearchTerms({ ...searchTerms, cpl: e.target.value })}
+                                            />
+                                            <Search className="w-4 h-4 absolute left-2.5 top-2 text-gray-400" />
+                                        </div>
+                                        <select
+                                            className="select select-bordered select-sm w-full md:w-40"
+                                            value={levelFilters.cpl}
+                                            onChange={e => setLevelFilters({ ...levelFilters, cpl: e.target.value })}
+                                        >
+                                            <option value="">Semua Level</option>
+                                            <option value="institusi">Institusi</option>
+                                            <option value="fakultas">Fakultas</option>
+                                            <option value="prodi">Prodi</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto">
+                                        {selectedItems.length > 0 && (
+                                            <button onClick={handleBatchDelete} className="btn btn-error btn-sm gap-2">
+                                                <Trash2 className="w-4 h-4" /> Hapus massal
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => setShowAddDropdown(prev => ({ ...prev, cpl: !prev.cpl }))}
                                             className="btn btn-primary btn-sm gap-2"
@@ -677,8 +868,12 @@ export default function CurriculumPage() {
                                             </thead>
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                                 {cplData.length === 0 ? (
-                                                    <tr><td colSpan="4" className="text-center py-8 text-gray-500">Belum ada data CPL</td></tr>
-                                                ) : sortData(cplData, 'cpl').map(item => (
+                                                    <tr><td colSpan="6" className="text-center py-8 text-gray-500 italic">Belum ada data CPL</td></tr>
+                                                ) : sortData(cplData.filter(item => {
+                                                    const matchesSearch = !searchTerms.cpl || (item.kode_cpl + (item.kode_tampilan || '') + item.deskripsi + (item.kategori || '')).toLowerCase().includes(searchTerms.cpl.toLowerCase());
+                                                    const matchesLevel = !levelFilters.cpl || item.level === levelFilters.cpl;
+                                                    return matchesSearch && matchesLevel;
+                                                }), 'cpl').map(item => (
                                                     <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                                         <td className="font-mono font-semibold text-primary-600 dark:text-primary-400 py-3 px-4 whitespace-nowrap" title={`Internal: ${item.kode_cpl}`}>{item.kode_tampilan || item.kode_cpl}</td>
                                                         <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300 max-w-xl">{item.deskripsi}</td>
@@ -710,7 +905,11 @@ export default function CurriculumPage() {
                                     </div>
                                 ) : (
                                     <div className={`grid gap-4 ${viewMode === 'card' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-                                        {cplData.map(item => (
+                                        {cplData.filter(item => {
+                                            const matchesSearch = !searchTerms.cpl || (item.kode_cpl + (item.kode_tampilan || '') + item.deskripsi + (item.kategori || '')).toLowerCase().includes(searchTerms.cpl.toLowerCase());
+                                            const matchesLevel = !levelFilters.cpl || item.level === levelFilters.cpl;
+                                            return matchesSearch && matchesLevel;
+                                        }).map(item => (
                                             <div key={item.id} className="card bg-base-100 shadow-sm border border-gray-200 dark:border-gray-700">
                                                 <div className="card-body p-4">
                                                     <div className="flex justify-between items-start">
@@ -733,9 +932,35 @@ export default function CurriculumPage() {
                         {/* BAHAN KAJIAN CONTENT */}
                         {activeTab === 'bahan-kajian' && (
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                                    <div className="text-sm font-medium text-gray-500">Manajemen Data Bahan Kajian (BK)</div>
-                                    <div className="relative">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                                    <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto flex-1">
+                                        <div className="relative flex-1 max-w-md">
+                                            <input
+                                                type="text"
+                                                placeholder="Cari BK..."
+                                                className="input input-bordered input-sm w-full pl-8"
+                                                value={searchTerms.bk}
+                                                onChange={e => setSearchTerms({ ...searchTerms, bk: e.target.value })}
+                                            />
+                                            <Search className="w-4 h-4 absolute left-2.5 top-2 text-gray-400" />
+                                        </div>
+                                        <select
+                                            className="select select-bordered select-sm w-full md:w-40"
+                                            value={levelFilters.bk}
+                                            onChange={e => setLevelFilters({ ...levelFilters, bk: e.target.value })}
+                                        >
+                                            <option value="">Semua Level</option>
+                                            <option value="institusi">Institusi</option>
+                                            <option value="fakultas">Fakultas</option>
+                                            <option value="prodi">Prodi</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto">
+                                        {selectedItems.length > 0 && (
+                                            <button onClick={handleBatchDelete} className="btn btn-error btn-sm gap-2">
+                                                <Trash2 className="w-4 h-4" /> Hapus massal
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => setShowAddDropdown(prev => ({ ...prev, bk: !prev.bk }))}
                                             className="btn btn-primary btn-sm gap-2"
@@ -809,8 +1034,12 @@ export default function CurriculumPage() {
                                             </thead>
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                                 {bkData.length === 0 ? (
-                                                    <tr><td colSpan="5" className="text-center py-8 text-gray-500">Belum ada data Bahan Kajian</td></tr>
-                                                ) : sortData(bkData, 'bk').map(item => (
+                                                    <tr><td colSpan="7" className="text-center py-8 text-gray-500 italic">Belum ada data Bahan Kajian</td></tr>
+                                                ) : sortData(bkData.filter(item => {
+                                                    const matchesSearch = !searchTerms.bk || (item.kode_bk + (item.kode_tampilan || '') + item.deskripsi + (item.jenis || '')).toLowerCase().includes(searchTerms.bk.toLowerCase());
+                                                    const matchesLevel = !levelFilters.bk || item.level === levelFilters.bk;
+                                                    return matchesSearch && matchesLevel;
+                                                }), 'bk').map(item => (
                                                     <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                                         <td className="font-mono font-semibold text-primary-600 dark:text-primary-400 py-3 px-4 whitespace-nowrap" title={`Internal: ${item.kode_bk}`}>{item.kode_tampilan || item.kode_bk}</td>
                                                         <td className="py-3 px-4">
@@ -848,7 +1077,11 @@ export default function CurriculumPage() {
                                     <div className={`grid gap-4 ${viewMode === 'card' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                         {bkData.length === 0 ? (
                                             <div className="text-center py-8 text-gray-500 col-span-full">Belum ada data Bahan Kajian</div>
-                                        ) : bkData.map(item => (
+                                        ) : bkData.filter(item => {
+                                            const matchesSearch = !searchTerms.bk || (item.kode_bk + (item.kode_tampilan || '') + item.deskripsi + (item.jenis || '')).toLowerCase().includes(searchTerms.bk.toLowerCase());
+                                            const matchesLevel = !levelFilters.bk || item.level === levelFilters.bk;
+                                            return matchesSearch && matchesLevel;
+                                        }).map(item => (
                                             <div key={item.id} className="card bg-base-100 shadow-sm border border-gray-200 dark:border-gray-700">
                                                 <div className="card-body p-4">
                                                     <div className="flex justify-between items-start">
@@ -872,12 +1105,33 @@ export default function CurriculumPage() {
                         {/* CPMK CONTENT */}
                         {activeTab === 'cpmk' && (
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                                    <div className="text-sm font-medium text-gray-500">Manajemen Data CPMK</div>
-                                    <div className="flex gap-2">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                                    <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto flex-1">
+                                        <div className="relative flex-1 max-w-md">
+                                            <input
+                                                type="text"
+                                                placeholder="Cari CPMK..."
+                                                className="input input-bordered input-sm w-full pl-8"
+                                                value={searchTerms.cpmk}
+                                                onChange={e => setSearchTerms({ ...searchTerms, cpmk: e.target.value })}
+                                            />
+                                            <Search className="w-4 h-4 absolute left-2.5 top-2 text-gray-400" />
+                                        </div>
+                                        <select
+                                            className="select select-bordered select-sm w-full md:w-40"
+                                            value={levelFilters.cpmk}
+                                            onChange={e => setLevelFilters({ ...levelFilters, cpmk: e.target.value })}
+                                        >
+                                            <option value="">Semua Level</option>
+                                            <option value="institusi">Institusi</option>
+                                            <option value="fakultas">Fakultas</option>
+                                            <option value="prodi">Prodi</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto">
                                         {selectedItems.length > 0 && (
                                             <button onClick={handleBatchDelete} className="btn btn-error btn-sm gap-2">
-                                                <Trash2 className="w-4 h-4" /> Hapus Massal
+                                                <Trash2 className="w-4 h-4" /> Hapus massal
                                             </button>
                                         )}
                                         <div className="relative">
@@ -947,8 +1201,12 @@ export default function CurriculumPage() {
                                             </thead>
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                                 {cpmkData.length === 0 ? (
-                                                    <tr><td colSpan="5" className="text-center py-8 text-gray-500">Belum ada data CPMK</td></tr>
-                                                ) : sortData(cpmkData, 'cpmk').map(item => (
+                                                    <tr><td colSpan="7" className="text-center py-8 text-gray-500 italic">Belum ada data CPMK</td></tr>
+                                                ) : sortData(cpmkData.filter(item => {
+                                                    const matchesSearch = !searchTerms.cpmk || (item.kode_cpmk + (item.kode_tampilan || '') + item.deskripsi + (item.cpl?.kode_tampilan || '')).toLowerCase().includes(searchTerms.cpmk.toLowerCase());
+                                                    const matchesLevel = !levelFilters.cpmk || item.level === levelFilters.cpmk;
+                                                    return matchesSearch && matchesLevel;
+                                                }), 'cpmk').map(item => (
                                                     <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                                         <td className="py-3 px-4">
                                                             <input type="checkbox" className="checkbox checkbox-sm" checked={selectedItems.includes(item.id)} onChange={() => handleSelectItem(item.id)} />
@@ -986,7 +1244,11 @@ export default function CurriculumPage() {
                                     <div className={`grid gap-4 ${viewMode === 'card' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                         {cpmkData.length === 0 ? (
                                             <div className="text-center py-8 text-gray-500 col-span-full">Belum ada data CPMK</div>
-                                        ) : cpmkData.map(item => (
+                                        ) : cpmkData.filter(item => {
+                                            const matchesSearch = !searchTerms.cpmk || (item.kode_cpmk + (item.kode_tampilan || '') + item.deskripsi + (item.cpl?.kode_tampilan || '')).toLowerCase().includes(searchTerms.cpmk.toLowerCase());
+                                            const matchesLevel = !levelFilters.cpmk || item.level === levelFilters.cpmk;
+                                            return matchesSearch && matchesLevel;
+                                        }).map(item => (
                                             <div key={item.id} className="card bg-base-100 shadow-sm border border-gray-200 dark:border-gray-700">
                                                 <div className="card-body p-4">
                                                     <div className="flex justify-between items-start">
@@ -1009,12 +1271,33 @@ export default function CurriculumPage() {
                         {/* SUB-CPMK CONTENT */}
                         {activeTab === 'sub-cpmk' && (
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                                    <div className="text-sm font-medium text-gray-500">Manajemen Data Sub-CPMK</div>
-                                    <div className="flex gap-2">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                                    <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto flex-1">
+                                        <div className="relative flex-1 max-w-md">
+                                            <input
+                                                type="text"
+                                                placeholder="Cari Sub-CPMK..."
+                                                className="input input-bordered input-sm w-full pl-8"
+                                                value={searchTerms.subCpmk}
+                                                onChange={e => setSearchTerms({ ...searchTerms, subCpmk: e.target.value })}
+                                            />
+                                            <Search className="w-4 h-4 absolute left-2.5 top-2 text-gray-400" />
+                                        </div>
+                                        <select
+                                            className="select select-bordered select-sm w-full md:w-40"
+                                            value={levelFilters.subCpmk}
+                                            onChange={e => setLevelFilters({ ...levelFilters, subCpmk: e.target.value })}
+                                        >
+                                            <option value="">Semua Level</option>
+                                            <option value="institusi">Institusi</option>
+                                            <option value="fakultas">Fakultas</option>
+                                            <option value="prodi">Prodi</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto">
                                         {selectedItems.length > 0 && (
                                             <button onClick={handleBatchDelete} className="btn btn-error btn-sm gap-2">
-                                                <Trash2 className="w-4 h-4" /> Hapus Massal
+                                                <Trash2 className="w-4 h-4" /> Hapus massal
                                             </button>
                                         )}
                                         <div className="relative">
@@ -1095,8 +1378,12 @@ export default function CurriculumPage() {
                                             </thead>
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                                 {subCpmkData.length === 0 ? (
-                                                    <tr><td colSpan="6" className="text-center py-8 text-gray-500">Belum ada data Sub-CPMK</td></tr>
-                                                ) : sortData(subCpmkData, 'subCpmk').map(item => (
+                                                    <tr><td colSpan="8" className="text-center py-8 text-gray-500 italic">Belum ada data Sub-CPMK</td></tr>
+                                                ) : sortData(subCpmkData.filter(item => {
+                                                    const matchesSearch = !searchTerms.subCpmk || (item.kode_sub_cpmk + (item.kode_tampilan || '') + item.deskripsi + (item.cpmk?.kode_tampilan || '')).toLowerCase().includes(searchTerms.subCpmk.toLowerCase());
+                                                    const matchesLevel = !levelFilters.subCpmk || item.level === levelFilters.subCpmk;
+                                                    return matchesSearch && matchesLevel;
+                                                }), 'subCpmk').map(item => (
                                                     <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                                         <td className="py-3 px-4">
                                                             <input type="checkbox" className="checkbox checkbox-sm" checked={selectedItems.includes(item.id)} onChange={() => handleSelectItem(item.id)} />
@@ -1135,7 +1422,11 @@ export default function CurriculumPage() {
                                     <div className={`grid gap-4 ${viewMode === 'card' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                                         {subCpmkData.length === 0 ? (
                                             <div className="text-center py-8 text-gray-500 col-span-full">Belum ada data Sub-CPMK</div>
-                                        ) : subCpmkData.map(item => (
+                                        ) : subCpmkData.filter(item => {
+                                            const matchesSearch = !searchTerms.subCpmk || (item.kode_sub_cpmk + (item.kode_tampilan || '') + item.deskripsi + (item.cpmk?.kode_tampilan || '')).toLowerCase().includes(searchTerms.subCpmk.toLowerCase());
+                                            const matchesLevel = !levelFilters.subCpmk || item.level === levelFilters.subCpmk;
+                                            return matchesSearch && matchesLevel;
+                                        }).map(item => (
                                             <div key={item.id} className="card bg-base-100 shadow-sm border border-gray-200 dark:border-gray-700">
                                                 <div className="card-body p-4">
                                                     <div className="flex justify-between items-start">
@@ -1164,9 +1455,30 @@ export default function CurriculumPage() {
             {/* --- MODALS --- */}
             {/* CPL Modal */}
             {showCPLModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6 my-auto">
                         <h3 className="font-bold text-lg mb-4">{editingItem ? 'Edit CPL' : 'Tambah CPL'}</h3>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-100 dark:border-gray-800">
+                            <div className="form-control">
+                                <label className="label"><span className="label-text font-semibold">Level Organisasi</span></label>
+                                <select className="select select-bordered select-sm w-full" value={formData.level || 'prodi'} onChange={e => handleLevelChange(e.target.value)}>
+                                    <option value="institusi">Institusi (Global)</option>
+                                    <option value="fakultas">Fakultas</option>
+                                    <option value="prodi">Program Studi</option>
+                                </select>
+                            </div>
+                            {formData.level === 'fakultas' && renderUnitSelection('fakultas')}
+                            {formData.level === 'prodi' && renderUnitSelection('prodi')}
+                            {formData.level === 'institusi' && (userProfile?.role === 'kaprodi' || userProfile?.role === 'dosen') && (
+                                <div className="form-control">
+                                    <label className="label"><span className="label-text font-semibold">Unit</span></label>
+                                    <div className="input input-bordered input-sm flex items-center bg-gray-100 dark:bg-gray-800 font-medium cursor-not-allowed">
+                                        -
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         <div className="form-control mb-4">
                             <label className="label"><span className="label-text">Kode CPL Display</span></label>
                             <div className="flex gap-2">
@@ -1216,9 +1528,31 @@ export default function CurriculumPage() {
 
             {/* CPMK Modal */}
             {showCPMKModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6 my-auto">
                         <h3 className="font-bold text-lg mb-4">{editingItem ? 'Edit CPMK' : 'Tambah CPMK'}</h3>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-100 dark:border-gray-800">
+                            <div className="form-control">
+                                <label className="label"><span className="label-text font-semibold">Level Organisasi</span></label>
+                                <select className="select select-bordered select-sm w-full" value={formData.level || 'prodi'} onChange={e => handleLevelChange(e.target.value)}>
+                                    <option value="institusi">Institusi (Global)</option>
+                                    <option value="fakultas">Fakultas</option>
+                                    <option value="prodi">Program Studi</option>
+                                </select>
+                            </div>
+                            {formData.level === 'fakultas' && renderUnitSelection('fakultas')}
+                            {formData.level === 'prodi' && renderUnitSelection('prodi')}
+                            {formData.level === 'institusi' && (userProfile?.role === 'kaprodi' || userProfile?.role === 'dosen') && (
+                                <div className="form-control">
+                                    <label className="label"><span className="label-text font-semibold">Unit</span></label>
+                                    <div className="input input-bordered input-sm flex items-center bg-gray-100 dark:bg-gray-800 font-medium cursor-not-allowed">
+                                        -
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="form-control mb-4">
                             <label className="label"><span className="label-text">CPL Induk</span></label>
                             <select className="select select-bordered w-full border border-gray-300 dark:border-gray-600" value={formData.cpl_id || ''} onChange={e => setFormData({ ...formData, cpl_id: e.target.value })}>
@@ -1272,9 +1606,31 @@ export default function CurriculumPage() {
 
             {/* BK Modal */}
             {showBKModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6 my-auto">
                         <h3 className="font-bold text-lg mb-4">{editingItem ? 'Edit Bahan Kajian' : 'Tambah Bahan Kajian'}</h3>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-100 dark:border-gray-800">
+                            <div className="form-control">
+                                <label className="label"><span className="label-text font-semibold">Level Organisasi</span></label>
+                                <select className="select select-bordered select-sm w-full" value={formData.level || 'prodi'} onChange={e => handleLevelChange(e.target.value)}>
+                                    <option value="institusi">Institusi (Global)</option>
+                                    <option value="fakultas">Fakultas</option>
+                                    <option value="prodi">Program Studi</option>
+                                </select>
+                            </div>
+                            {formData.level === 'fakultas' && renderUnitSelection('fakultas')}
+                            {formData.level === 'prodi' && renderUnitSelection('prodi')}
+                            {formData.level === 'institusi' && (userProfile?.role === 'kaprodi' || userProfile?.role === 'dosen') && (
+                                <div className="form-control">
+                                    <label className="label"><span className="label-text font-semibold">Unit</span></label>
+                                    <div className="input input-bordered input-sm flex items-center bg-gray-100 dark:bg-gray-800 font-medium cursor-not-allowed">
+                                        -
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="form-control mb-4">
                             <label className="label"><span className="label-text">Kode BK Display</span></label>
                             <div className="flex gap-2">
@@ -1329,9 +1685,30 @@ export default function CurriculumPage() {
             {/* Sub-CPMK Modal */}
             {
                 showSubCPMKModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6 my-auto">
                             <h3 className="font-bold text-lg mb-4">{editingItem ? 'Edit Sub-CPMK' : 'Tambah Sub-CPMK'}</h3>
+
+                            <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <div className="form-control">
+                                    <label className="label"><span className="label-text font-semibold">Level Organisasi</span></label>
+                                    <select className="select select-bordered select-sm w-full" value={formData.level || 'prodi'} onChange={e => handleLevelChange(e.target.value)}>
+                                        <option value="institusi">Institusi (Global)</option>
+                                        <option value="fakultas">Fakultas</option>
+                                        <option value="prodi">Program Studi</option>
+                                    </select>
+                                </div>
+                                {formData.level === 'fakultas' && renderUnitSelection('fakultas')}
+                                {formData.level === 'prodi' && renderUnitSelection('prodi')}
+                                {formData.level === 'institusi' && (userProfile?.role === 'kaprodi' || userProfile?.role === 'dosen') && (
+                                    <div className="form-control">
+                                        <label className="label"><span className="label-text font-semibold">Unit</span></label>
+                                        <div className="input input-bordered input-sm flex items-center bg-gray-100 dark:bg-gray-800 font-medium cursor-not-allowed">
+                                            -
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* CPL Filter */}
                             <div className="form-control mb-4">

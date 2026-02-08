@@ -13,17 +13,34 @@ export default function RPSViewPage() {
     const [course, setCourse] = useState(null);
     const [editMode, setEditMode] = useState(false);
     const [settings, setSettings] = useState(null);
+    const [signatures, setSignatures] = useState({}); // Map: "Nama Lengkap" -> Signature URL
 
     useEffect(() => {
-        const fetchSettings = async () => {
+        const fetchSettingsAndSignatures = async () => {
             try {
-                const res = await axios.get('/settings');
-                setSettings(res.data);
+                const [settingsRes, signaturesRes] = await Promise.all([
+                    axios.get('/settings').catch(() => ({ data: null })),
+                    axios.get('/auth/signatures').catch(() => ({ data: [] }))
+                ]);
+
+                setSettings(settingsRes.data);
+
+                // Create a map for easy lookup: Name -> Signature URL
+                const sigMap = {};
+                if (Array.isArray(signaturesRes.data)) {
+                    signaturesRes.data.forEach(u => {
+                        if (u.nama_lengkap && u.signature) {
+                            sigMap[u.nama_lengkap] = u.signature;
+                        }
+                    });
+                }
+                setSignatures(sigMap);
+
             } catch (err) {
-                console.error('Failed to load global settings:', err);
+                console.error('Failed to load initial data:', err);
             }
         };
-        fetchSettings();
+        fetchSettingsAndSignatures();
     }, []);
 
     useEffect(() => {
@@ -217,7 +234,7 @@ export default function RPSViewPage() {
                         <table className="w-full border border-black mb-4">
                             <tbody>
                                 <tr className="bg-gray-200 print:bg-gray-200">
-                                    <td className="border border-black p-1 font-bold w-[20%] align-middle" rowSpan="2">
+                                    <td className="border border-black p-1 font-bold w-[20%] align-middle" rowSpan="4">
                                         OTORISASI / PENGESAHAN
                                     </td>
                                     <td className="border border-black p-1 font-bold w-[26%] text-center">Pengembang RPS</td>
@@ -225,14 +242,61 @@ export default function RPSViewPage() {
                                     <td className="border border-black p-1 font-bold w-[28%] text-center">Ketua Program Studi</td>
                                 </tr>
                                 <tr>
-                                    <td className="border border-black p-4 text-center align-bottom h-24">
-                                        <div className="font-bold underline mb-1">{rpsData?.pengembang_rps || rpsData?.dosen?.nama_lengkap || '(...................)'}</div>
+                                    <td className="border border-black p-4 text-center align-bottom h-24 relative">
+                                        {signatures[rpsData?.pengembang_rps || rpsData?.dosen?.nama_lengkap] && (
+                                            <img
+                                                src={signatures[rpsData?.pengembang_rps || rpsData?.dosen?.nama_lengkap]}
+                                                alt="Paraf"
+                                                className="absolute bottom-6 left-1/2 transform -translate-x-1/2 max-h-16 max-w-[90%] object-contain"
+                                            />
+                                        )}
+                                        <div className="font-bold underline mb-1 relative z-10">{rpsData?.pengembang_rps || rpsData?.dosen?.nama_lengkap || '(...................)'}</div>
                                     </td>
-                                    <td className="border border-black p-4 text-center align-bottom h-24">
-                                        <div className="font-bold underline mb-1">{rpsData?.koordinator_rumpun_mk || '(...................)'}</div>
+                                    <td className="border border-black p-4 text-center align-bottom h-24 relative">
+                                        {signatures[rpsData?.koordinator_rumpun_mk] && (
+                                            <img
+                                                src={signatures[rpsData?.koordinator_rumpun_mk]}
+                                                alt="Paraf"
+                                                className="absolute bottom-6 left-1/2 transform -translate-x-1/2 max-h-16 max-w-[90%] object-contain"
+                                            />
+                                        )}
+                                        <div className="font-bold underline mb-1 relative z-10">{rpsData?.koordinator_rumpun_mk || '(...................)'}</div>
                                     </td>
-                                    <td className="border border-black p-4 text-center align-bottom h-24">
-                                        <div className="font-bold underline mb-1">{rpsData?.ketua_prodi || '(...................)'}</div>
+                                    <td className="border border-black p-4 text-center align-bottom h-24 relative">
+                                        {signatures[rpsData?.ketua_prodi] && rpsData?.status === 'approved' && (
+                                            <img
+                                                src={signatures[rpsData?.ketua_prodi]}
+                                                alt="Paraf"
+                                                className="absolute bottom-6 left-1/2 transform -translate-x-1/2 max-h-16 max-w-[90%] object-contain"
+                                            />
+                                        )}
+                                        <div className="font-bold underline mb-1 relative z-10">{rpsData?.ketua_prodi || '(...................)'}</div>
+                                    </td>
+                                </tr>
+                                <tr className="bg-gray-200 print:bg-gray-200">
+                                    <td className="border border-black p-1 font-bold text-center" colSpan="2">Dekan</td>
+                                    <td className="border border-black p-1 font-bold text-center">Penjaminan Mutu</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-black p-4 text-center align-bottom h-24 relative" colSpan="2">
+                                        {signatures[rpsData?.dekan] && rpsData?.status === 'approved' && (
+                                            <img
+                                                src={signatures[rpsData?.dekan]}
+                                                alt="Paraf"
+                                                className="absolute bottom-6 left-1/2 transform -translate-x-1/2 max-h-16 max-w-[90%] object-contain"
+                                            />
+                                        )}
+                                        <div className="font-bold underline mb-1 relative z-10">{rpsData?.dekan || '(...................)'}</div>
+                                    </td>
+                                    <td className="border border-black p-4 text-center align-bottom h-24 relative">
+                                        {signatures[rpsData?.penjaminan_mutu] && rpsData?.status === 'approved' && (
+                                            <img
+                                                src={signatures[rpsData?.penjaminan_mutu]}
+                                                alt="Paraf"
+                                                className="absolute bottom-6 left-1/2 transform -translate-x-1/2 max-h-16 max-w-[90%] object-contain"
+                                            />
+                                        )}
+                                        <div className="font-bold underline mb-1 relative z-10">{rpsData?.penjaminan_mutu || '(...................)'}</div>
                                     </td>
                                 </tr>
                             </tbody>

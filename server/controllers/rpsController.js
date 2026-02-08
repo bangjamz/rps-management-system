@@ -34,9 +34,14 @@ export const getAllRPS = async (req, res) => {
             mataKuliahWhere.prodi_id = prodiList.map(p => p.id);
         }
 
-        // Optional prodi filter for admin/dekan
-        if (prodiId && [ROLES.ADMIN_INSTITUSI, ROLES.DEKAN].includes(user.role)) {
+        // Optional prodi filter for admin/dekan/QA
+        if (prodiId && [ROLES.ADMIN_INSTITUSI, ROLES.DEKAN, ROLES.QA].includes(user.role)) {
             mataKuliahWhere.prodi_id = parseInt(prodiId);
+        }
+
+        // QA sees all RPS (no specific filtering needed beyond optional prodiId)
+        if (user.role === ROLES.QA) {
+            // No restriction
         }
 
         const rpsList = await RPS.findAll({
@@ -518,7 +523,14 @@ export const approveRPS = async (req, res) => {
             include: [{
                 model: MataKuliah,
                 as: 'mata_kuliah',
-                include: [{ model: Prodi, as: 'prodi' }]
+                include: [{
+                    model: Prodi,
+                    as: 'prodi',
+                    include: [
+                        { model: Fakultas, as: 'fakultas', include: [{ model: User, as: 'dekan' }] },
+                        { model: User, as: 'kaprodi' }
+                    ]
+                }]
             }]
         });
 
@@ -526,28 +538,68 @@ export const approveRPS = async (req, res) => {
             return res.status(404).json({ message: 'RPS not found' });
         }
 
-        // Only kaprodi can approve
-        if (user.role !== ROLES.KAPRODI) {
-            return res.status(403).json({ message: 'Only Kaprodi can approve RPS' });
+        // Allow Kaprodi, Dekan, or QA to approve
+        if (![ROLES.KAPRODI, ROLES.DEKAN, ROLES.QA].includes(user.role)) {
+            return res.status(403).json({ message: 'Only Kaprodi, Dekan, or QA can approve RPS' });
         }
 
-        // Verify it's their prodi
-        if (rps.mata_kuliah.prodi_id !== user.prodi_id) {
-            return res.status(403).json({ message: 'You can only approve RPS for your prodi' });
+        // Verify ownership/scope
+        if (user.role === ROLES.KAPRODI) {
+            if (rps.mata_kuliah.prodi_id !== user.prodi_id) {
+                return res.status(403).json({ message: 'You can only approve RPS for your prodi' });
+            }
+        } else if (user.role === ROLES.DEKAN) {
+            if (rps.mata_kuliah.prodi.fakultas_id !== user.fakultas_id) {
+                return res.status(403).json({ message: 'You can only approve RPS for your faculty' });
+            }
         }
+        // QA can approve any RPS (Global Scope)
 
-        // Allow 'pending' OR 'draft' to be approved (force approval)
-        if (!['pending', 'draft'].includes(rps.status)) {
+        // Allow 'pending', 'draft', or 'approved' (re-approval/signing)
+        if (!['pending', 'draft', 'approved'].includes(rps.status)) {
             return res.status(400).json({
-                message: 'Only pending or draft RPS can be approved',
+                message: 'RPS status not valid for approval',
                 currentStatus: rps.status
             });
         }
 
+        // Find QA User for auto-population
+        const qaUser = await User.findOne({ where: { role: ROLES.QA } });
+
+        // Update Status
         rps.status = 'approved';
-        rps.approved_by = user.id;
         rps.approved_at = new Date();
         if (catatan_approval) rps.catatan_approval = catatan_approval;
+
+        // If user is Kaprodi, set approved_by (primary approver)
+        if (user.role === ROLES.KAPRODI) {
+            rps.approved_by = user.id;
+            rps.ketua_prodi = user.nama_lengkap;
+        }
+
+        // If user is Dekan, just ensure dekan name is set (not primarily approved_by unless we want to track that too)
+        // We will keep approved_by as the one who triggered it, or update it?
+        // Let's update approved_by to the LATEST approver
+        rps.approved_by = user.id;
+
+        // Auto-populate missing names (Snapshots)
+        // Auto-populate missing names (Snapshots)
+        // Use optional chaining to prevent crashes if helpers are missing
+        if (!rps.ketua_prodi && rps.mata_kuliah?.prodi?.kaprodi) {
+            rps.ketua_prodi = rps.mata_kuliah.prodi.kaprodi.nama_lengkap;
+        }
+
+        if (user.role === ROLES.DEKAN) {
+            rps.dekan = user.nama_lengkap;
+        } else if (!rps.dekan && rps.mata_kuliah?.prodi?.fakultas?.dekan) {
+            rps.dekan = rps.mata_kuliah.prodi.fakultas.dekan.nama_lengkap;
+        }
+
+        if (user.role === ROLES.QA) {
+            rps.penjaminan_mutu = user.nama_lengkap;
+        } else if (!rps.penjaminan_mutu && qaUser) {
+            rps.penjaminan_mutu = qaUser.nama_lengkap;
+        }
 
         await rps.save();
 
@@ -555,7 +607,7 @@ export const approveRPS = async (req, res) => {
             include: [
                 { model: MataKuliah, as: 'mata_kuliah' },
                 { model: User, as: 'dosen', attributes: ['id', 'nama_lengkap'] },
-                { model: User, as: 'approved_by_user', attributes: ['id', 'nama_lengkap'] }
+                { model: User, as: 'approver', attributes: ['id', 'nama_lengkap'] }
             ]
         });
 
@@ -592,20 +644,27 @@ export const rejectRPS = async (req, res) => {
             return res.status(404).json({ message: 'RPS not found' });
         }
 
-        // Only kaprodi can reject
-        if (user.role !== ROLES.KAPRODI) {
-            return res.status(403).json({ message: 'Only Kaprodi can reject RPS' });
+        // Only kaprodi, dekan, or qa can reject
+        if (![ROLES.KAPRODI, ROLES.DEKAN, ROLES.QA].includes(user.role)) {
+            return res.status(403).json({ message: 'Only Kaprodi, Dekan, or QA can reject RPS' });
         }
 
-        // Verify it's their prodi
-        if (rps.mata_kuliah.prodi_id !== user.prodi_id) {
-            return res.status(403).json({ message: 'You can only reject RPS for your prodi' });
+        // Verify permissions/scope
+        if (user.role === ROLES.KAPRODI) {
+            if (rps.mata_kuliah.prodi_id !== user.prodi_id) {
+                return res.status(403).json({ message: 'You can only reject RPS for your prodi' });
+            }
+        } else if (user.role === ROLES.DEKAN) {
+            if (rps.mata_kuliah.prodi.fakultas_id !== user.fakultas_id) {
+                return res.status(403).json({ message: 'You can only reject RPS for your faculty' });
+            }
         }
+        // QA can reject any RPS (Global Scope)
 
-        // Allow 'pending' OR 'draft' to be rejected
-        if (!['pending', 'draft'].includes(rps.status)) {
+        // Allow 'pending', 'draft', or 'approved' to be rejected (Revisi)
+        if (!['pending', 'draft', 'approved'].includes(rps.status)) {
             return res.status(400).json({
-                message: 'Only pending or draft RPS can be rejected',
+                message: 'RPS status not valid for rejection/revision',
                 currentStatus: rps.status
             });
         }
@@ -621,7 +680,7 @@ export const rejectRPS = async (req, res) => {
             include: [
                 { model: MataKuliah, as: 'mata_kuliah' },
                 { model: User, as: 'dosen', attributes: ['id', 'nama_lengkap'] },
-                { model: User, as: 'approved_by_user', attributes: ['id', 'nama_lengkap'] }
+                { model: User, as: 'approver', attributes: ['id', 'nama_lengkap'] }
             ]
         });
 

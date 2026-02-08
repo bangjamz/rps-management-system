@@ -147,6 +147,10 @@ export const exportRPSToPDF = async (course, rpsData) => {
                     { content: `Koordinator Rumpun MK\n\n\n\n${rpsData?.koordinator_rumpun_mk || '(..................)'}`, styles: { halign: 'center', minCellHeight: 25 } },
                     { content: `Ketua Program Studi\n\n\n\n${rpsData?.ketua_prodi || '(..................)'}`, styles: { halign: 'center', minCellHeight: 25 } }
                 ],
+                [
+                    { content: `Dekan\n\n\n\n${rpsData?.dekan || '(..................)'}`, colSpan: 1, styles: { halign: 'center', minCellHeight: 25 } },
+                    { content: `Penjaminan Mutu\n\n\n\n${rpsData?.penjaminan_mutu || '(..................)'}`, colSpan: 2, styles: { halign: 'center', minCellHeight: 25 } }
+                ]
             ],
             theme: 'grid',
             styles: { fontSize: 8 },

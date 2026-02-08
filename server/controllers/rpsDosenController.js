@@ -87,9 +87,10 @@ export const createRPS = async (req, res) => {
             pengembang_rps,
             koordinator_rumpun_mk,
             ketua_prodi,
-            cpl_ids,
             cpmk_ids,
-            sub_cpmk_list // Add this
+            sub_cpmk_list, // Add this
+            dekan,
+            penjaminan_mutu
         } = req.body;
 
         console.log('Creating RPS with data:', { mata_kuliah_id, semester, tahun_ajaran, user_id: req.user?.id });
@@ -137,7 +138,10 @@ export const createRPS = async (req, res) => {
             rumpun_mk: rumpun_mk || '',
             pengembang_rps: pengembang_rps || req.user?.nama_lengkap || '',
             koordinator_rumpun_mk: koordinator_rumpun_mk || '',
+            koordinator_rumpun_mk: koordinator_rumpun_mk || '',
             ketua_prodi: ketua_prodi || '',
+            dekan: dekan || '',
+            penjaminan_mutu: penjaminan_mutu || '',
             pustaka_utama: req.body.pustaka_utama || '',
             pustaka_pendukung: req.body.pustaka_pendukung || '',
             media_software: req.body.media_software || '',
@@ -189,9 +193,22 @@ export const createRevision = async (req, res) => {
             return res.status(404).json({ message: 'Original RPS not found' });
         }
 
-        // Check permission: Owner or Kaprodi
+        // Check permission: Owner, Kaprodi, or assigned lecturer
         const isOwner = oldRps.dosen_id === user.id;
-        const canRevise = isOwner || ['kaprodi', 'dekan'].includes(user.role);
+        let isAssigned = false;
+
+        if (user.role === 'dosen') {
+            const assignment = await DosenAssignment.findOne({
+                where: {
+                    mata_kuliah_id: oldRps.mata_kuliah_id,
+                    dosen_id: user.id,
+                    is_active: true
+                }
+            });
+            isAssigned = !!assignment;
+        }
+
+        const canRevise = isOwner || isAssigned || ['kaprodi', 'dekan'].includes(user.role);
 
         if (!canRevise) {
             return res.status(403).json({ message: 'You do not have permission to create a revision for this RPS' });
@@ -233,7 +250,10 @@ export const createRevision = async (req, res) => {
             rumpun_mk: oldRps.rumpun_mk,
             pengembang_rps: oldRps.pengembang_rps,
             koordinator_rumpun_mk: oldRps.koordinator_rumpun_mk,
+            koordinator_rumpun_mk: oldRps.koordinator_rumpun_mk,
             ketua_prodi: oldRps.ketua_prodi,
+            dekan: oldRps.dekan,
+            penjaminan_mutu: oldRps.penjaminan_mutu,
             pustaka_utama: oldRps.pustaka_utama,
             pustaka_pendukung: oldRps.pustaka_pendukung,
             media_software: oldRps.media_software,
@@ -308,7 +328,9 @@ export const updateRPS = async (req, res) => {
             mk_syarat,
             ambang_batas_mhs,
             ambang_batas_mk,
-            metode_penilaian // Add this
+            metode_penilaian, // Add this
+            dekan,
+            penjaminan_mutu
         } = req.body;
 
         const rps = await RPS.findByPk(rpsId);
@@ -353,6 +375,8 @@ export const updateRPS = async (req, res) => {
         if (pengembang_rps !== undefined) updateData.pengembang_rps = pengembang_rps;
         if (koordinator_rumpun_mk !== undefined) updateData.koordinator_rumpun_mk = koordinator_rumpun_mk;
         if (ketua_prodi !== undefined) updateData.ketua_prodi = ketua_prodi;
+        if (dekan !== undefined) updateData.dekan = dekan;
+        if (penjaminan_mutu !== undefined) updateData.penjaminan_mutu = penjaminan_mutu;
         if (referensi !== undefined) updateData.referensi = referensi;
         if (pustaka_utama !== undefined) updateData.pustaka_utama = pustaka_utama;
         if (pustaka_pendukung !== undefined) updateData.pustaka_pendukung = pustaka_pendukung;
@@ -698,9 +722,14 @@ export const getDosenCourses = async (req, res) => {
             return res.status(404).json({ message: 'User has no prodi assigned' });
         }
 
-        // Get all courses in user's prodi
+        // Get all courses in user's prodi + institusi scope
         const courses = await MataKuliah.findAll({
-            where: { prodi_id: user.prodi_id },
+            where: {
+                [Op.or]: [
+                    { prodi_id: user.prodi_id },
+                    { scope: 'institusi' }
+                ]
+            },
             include: [
                 {
                     model: DosenAssignment,

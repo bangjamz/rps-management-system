@@ -25,7 +25,7 @@ import {
     FaUserPlus,
     FaBars
 } from 'react-icons/fa';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, BookOpen } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import axios from '../lib/axios';
 
@@ -133,6 +133,12 @@ const SuperAdminDashboard = () => {
             path: '/super-admin/organization',
             icon: <FaBuilding className="w-5 h-5" />,
             description: 'Kelola fakultas dan program studi'
+        },
+        {
+            title: 'Daftar Mata Kuliah',
+            path: '/super-admin/courses',
+            icon: <BookOpen className="w-5 h-5" />,
+            description: 'Kelola semua mata kuliah'
         },
         {
             title: 'Pengaturan Akademik',

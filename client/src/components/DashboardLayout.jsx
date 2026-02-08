@@ -7,7 +7,7 @@ import useGlobalStore from '../store/useGlobalStore';
 import { ROLES } from '../utils/permissions';
 import {
     Home, GraduationCap, BookOpen, FileText, Users, BarChart, Award, FileQuestion, HelpCircle, AlertTriangle, LogIn, Search, X, Sun, Moon,
-    Calendar, Settings, ArrowLeftRight, ChevronDown, User, LogOut
+    Calendar, Settings, ArrowLeftRight, ChevronDown, User, LogOut, Check
 } from 'lucide-react';
 import axios from '../lib/axios';
 import HelpModal from './HelpModal';
@@ -181,10 +181,15 @@ export default function DashboardLayout({ children }) {
 
     // Navigation items based on role
     const navItems = useMemo(() => {
+        const commonLinks = [
+            { label: 'Beranda', icon: User, path: '/profile' }
+        ];
+
         // KAPRODI VIEW
         if (activeRole === ROLES.KAPRODI) {
             return [
-                { label: 'Beranda', icon: Home, path: '/kaprodi/dashboard' },
+                ...commonLinks,
+                { label: 'Dashboard', icon: Home, path: '/kaprodi/dashboard' },
                 { label: 'Kurikulum', icon: GraduationCap, path: '/kaprodi/curriculum' },
                 { label: 'Mata Kuliah', icon: BookOpen, path: '/kaprodi/courses' },
                 { label: 'Distribusi MK', icon: Calendar, path: '/kaprodi/mk-aktif' },
@@ -194,10 +199,29 @@ export default function DashboardLayout({ children }) {
             ];
         }
 
+        // DEKAN VIEW
+        if (activeRole === ROLES.DEKAN) {
+            return [
+                ...commonLinks,
+                { label: 'Dashboard', icon: Home, path: '/dekan/dashboard' },
+                { label: 'Kelola RPS', icon: FileText, path: '/dekan/rps-approval' },
+            ];
+        }
+
+        // QA (PENJAMINAN MUTU) VIEW
+        if (activeRole === ROLES.QA) {
+            return [
+                ...commonLinks,
+                { label: 'Dashboard', icon: Home, path: '/qa/dashboard' },
+                { label: 'Approval RPS', icon: Check, path: '/qa/rps-approval' },
+            ];
+        }
+
         // DOSEN VIEW (Active Role is Dosen OR User is just Dosen)
         if (activeRole === ROLES.DOSEN) {
             return [
-                { label: 'Beranda', icon: Home, path: '/dosen/dashboard' },
+                ...commonLinks,
+                { label: 'Dashboard', icon: Home, path: '/dosen/dashboard' },
                 { label: 'Mata Kuliah Saya', icon: BookOpen, path: '/dosen/courses' },
                 { label: 'RPS Saya', icon: FileText, path: '/dosen/rps' },
             ];
@@ -206,7 +230,8 @@ export default function DashboardLayout({ children }) {
         // MAHASISWA VIEW
         if (activeRole === ROLES.MAHASISWA) {
             return [
-                { label: 'Beranda', icon: Home, path: '/mahasiswa/dashboard' },
+                ...commonLinks,
+                { label: 'Dashboard', icon: Home, path: '/mahasiswa/dashboard' },
                 { label: 'Jadwal Kuliah', icon: Calendar, path: '/mahasiswa/schedule' },
                 { label: 'Nilai Semester', icon: Award, path: '/mahasiswa/grades' },
             ];
@@ -216,6 +241,7 @@ export default function DashboardLayout({ children }) {
         if (activeRole === 'superadmin' || activeRole === 'admin') {
             return [
                 { label: 'Panel Admin', icon: Settings, path: '/super-admin' },
+                { label: 'Kurikulum', icon: GraduationCap, path: '/super-admin/curriculum' },
                 // Add other common views if needed, or keep it exclusive
             ];
         }
@@ -448,7 +474,7 @@ export default function DashboardLayout({ children }) {
                                         onClick={() => setShowProfileMenu(false)}
                                     >
                                         <Settings size={16} />
-                                        Pengaturan Akun
+                                        Pengaturan
                                     </Link>
                                     <div className="border-t border-gray-100 dark:border-gray-800 my-1"></div>
                                     {/* Login As - Super Admin Only */}

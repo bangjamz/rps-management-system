@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import useAuthStore from '../store/useAuthStore';
-import { User, Mail, Phone, Briefcase, MapPin, Hash, Award, Camera, Image as ImageIcon, Palette, Search, Upload, X, Check, Loader2, Lock } from 'lucide-react';
+import { User, Mail, Phone, Briefcase, MapPin, Hash, Award, Camera, Image as ImageIcon, Palette, Search, Upload, X, Check, Loader2 } from 'lucide-react';
 import { getTagColor } from '../utils/ui';
 import axios from '../lib/axios';
 import { toast } from 'react-hot-toast';
@@ -45,8 +45,7 @@ const ProfilePage = () => {
     const [unsplashQuery, setUnsplashQuery] = useState('');
     const [unsplashResults, setUnsplashResults] = useState([]);
     const [searchingUnsplash, setSearchingUnsplash] = useState(false);
-    const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    const [changingPassword, setChangingPassword] = useState(false);
+
 
     // Upload refs
     const coverFileRef = useRef(null);
@@ -63,6 +62,8 @@ const ProfilePage = () => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+
 
     if (!user) return null;
 
@@ -174,31 +175,7 @@ const ProfilePage = () => {
 
     // --- Password Handler ---
 
-    const handleChangePassword = async (e) => {
-        e.preventDefault();
-        if (passwordData.newPassword !== passwordData.confirmPassword) {
-            toast.error('Passwords do not match');
-            return;
-        }
-        if (passwordData.newPassword.length < 6) {
-            toast.error('Password must be at least 6 characters');
-            return;
-        }
 
-        setChangingPassword(true);
-        try {
-            await axios.post('/auth/change-password', {
-                currentPassword: passwordData.currentPassword,
-                newPassword: passwordData.newPassword
-            });
-            toast.success('Password changed successfully');
-            setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to change password');
-        } finally {
-            setChangingPassword(false);
-        }
-    };
 
 
     // Determine Cover Style
@@ -412,114 +389,60 @@ const ProfilePage = () => {
                     </div>
                 </div>
 
-                {/* Main Grid: Details + Security */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-                    {/* Left Column: Details (Span 2) */}
-                    <div className="lg:col-span-2 space-y-8">
-                        {/* Contact Info */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <Mail className="w-4 h-4 text-primary-500" /> Kontak
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Email</span>
-                                    <span className="font-medium text-gray-900 dark:text-white">{user.email}</span>
-                                </div>
-                                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Username</span>
-                                    <span className="font-medium text-gray-900 dark:text-white">@{user.username}</span>
-                                </div>
-                                <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Telepon</span>
-                                    <span className="font-medium text-gray-900 dark:text-white">{user.telepon || '-'}</span>
-                                </div>
+                {/* Main Content Area */}
+                <div className="space-y-8">
+                    {/* Contact Info */}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-primary-500" /> Kontak
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Email</span>
+                                <span className="font-medium text-gray-900 dark:text-white">{user.email}</span>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Username</span>
+                                <span className="font-medium text-gray-900 dark:text-white">@{user.username}</span>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Telepon</span>
+                                <span className="font-medium text-gray-900 dark:text-white">{user.telepon || '-'}</span>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Academic Info */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <Award className="w-4 h-4 text-primary-500" /> Akademik & Pekerjaan
-                            </h3>
-                            <div className="space-y-4">
-                                {(user.nidn || user.homebase) && (
-                                    <div className="flex gap-4">
-                                        {user.nidn && <span className="badge badge-outline">NIDN: {user.nidn}</span>}
-                                        {user.homebase && <span className="badge badge-primary badge-outline">{user.homebase}</span>}
+                    {/* Academic Info */}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <Award className="w-4 h-4 text-primary-500" /> Akademik & Pekerjaan
+                        </h3>
+                        <div className="space-y-4">
+                            {(user.nidn || user.homebase) && (
+                                <div className="flex gap-4">
+                                    {user.nidn && <span className="badge badge-outline">NIDN: {user.nidn}</span>}
+                                    {user.homebase && <span className="badge badge-primary badge-outline">{user.homebase}</span>}
+                                </div>
+                            )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {user.jabatan && (
+                                    <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
+                                        <Briefcase className="w-4 h-4 text-gray-400" />
+                                        <span>{user.jabatan}</span>
                                     </div>
                                 )}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {user.jabatan && (
-                                        <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                            <Briefcase className="w-4 h-4 text-gray-400" />
-                                            <span>{user.jabatan}</span>
-                                        </div>
-                                    )}
-                                    {user.status_kepegawaian && (
-                                        <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-                                            <Award className="w-4 h-4 text-gray-400" />
-                                            <span className={`${getTagColor(user.status_kepegawaian)} px-2 py-0.5 rounded text-xs font-semibold`}>
-                                                {user.status_kepegawaian}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
+                                {user.status_kepegawaian && (
+                                    <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
+                                        <Award className="w-4 h-4 text-gray-400" />
+                                        <span className={`${getTagColor(user.status_kepegawaian)} px-2 py-0.5 rounded text-xs font-semibold`}>
+                                            {user.status_kepegawaian}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Right Column: Security (Span 1) */}
-                    <div className="lg:col-span-1">
-                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 sticky top-24">
-                            <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-2">
-                                <Lock className="w-4 h-4 text-primary-500" /> Keamanan
-                            </h3>
-
-                            <form onSubmit={handleChangePassword} className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Password Saat Ini</label>
-                                    <input
-                                        type="password"
-                                        className="input input-sm w-full"
-                                        value={passwordData.currentPassword}
-                                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Password Baru</label>
-                                    <input
-                                        type="password"
-                                        className="input input-sm w-full"
-                                        value={passwordData.newPassword}
-                                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                                        required
-                                        minLength={6}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Konfirmasi Password</label>
-                                    <input
-                                        type="password"
-                                        className="input input-sm w-full"
-                                        value={passwordData.confirmPassword}
-                                        onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                                        required
-                                    />
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    className="btn btn-primary btn-sm w-full mt-2"
-                                    disabled={changingPassword}
-                                >
-                                    {changingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ganti Password'}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
 
                 </div>
             </div>
