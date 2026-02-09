@@ -15,7 +15,7 @@ export default function DosenDashboard() {
 
     const fetchStats = async () => {
         try {
-            const res = await axios.get('/api/dashboard/stats');
+            const res = await axios.get('/dashboard/stats');
             setStats(res.data.stats);
         } catch (error) {
             console.error('Failed to fetch stats:', error);

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BookOpen, User, Mail, Lock, Shield, School, ArrowRight } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import useGlobalStore from '../store/useGlobalStore';

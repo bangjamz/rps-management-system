@@ -42,7 +42,7 @@ const MKAktif = sequelize.define(
       // comment: 'Semester offering' // Commented for Sequelize 6.x compatibility
     },
     angkatan_target: {
-      type: DataTypes.JSON,
+      type: DataTypes.JSONB,
       allowNull: true,
       defaultValue: [],
       comment:

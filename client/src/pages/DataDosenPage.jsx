@@ -5,6 +5,7 @@ import {
     Settings, Plus, Trash2, Edit2, MoreVertical, X, Check
 } from 'lucide-react';
 import { getTagColor } from '../utils/ui';
+import axiosOriginal from 'axios';
 import axios from '../lib/axios';
 import useAuthStore from '../store/useAuthStore';
 import { ROLES } from '../utils/permissions';
@@ -51,18 +52,25 @@ export default function DataDosenPage() {
     };
 
     useEffect(() => {
-        fetchLecturers();
+        const controller = new AbortController();
+        fetchLecturers(controller.signal);
+        return () => controller.abort();
     }, []);
 
-    const fetchLecturers = async () => {
+    const fetchLecturers = async (signal) => {
         setLoading(true);
         try {
-            const res = await axios.get('/lecturer-assignments/available-lecturers');
+            const res = await axios.get('/lecturer-assignments/available-lecturers', { signal });
             setLecturers(res.data.lecturers || []);
         } catch (error) {
-            console.error('Failed to fetch lecturers:', error);
+            if (axiosOriginal.isCancel(error)) {
+                console.log('Request canceled:', error.message);
+            } else {
+                console.error('Failed to fetch lecturers:', error);
+            }
         } finally {
-            setLoading(false);
+            // Only set loading if not aborted, to avoid state update on unmount
+             if (!signal?.aborted) setLoading(false);
         }
     };
 
