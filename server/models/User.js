@@ -31,13 +31,13 @@ const User = sequelize.define('User', {
         type: DataTypes.ENUM('user', 'mahasiswa', 'dosen', 'kaprodi', 'dekan', 'admin', 'superadmin'),
         allowNull: false,
         defaultValue: 'user',
-        comment: 'User role hierarchy: user < mahasiswa/dosen < kaprodi < dekan < admin < superadmin'
+        // comment: 'User role hierarchy: user < mahasiswa/dosen < kaprodi < dekan < admin < superadmin'
     },
     status: {
         type: DataTypes.ENUM('pending', 'approved', 'rejected', 'active', 'suspended'),
         allowNull: false,
         defaultValue: 'pending',
-        comment: 'Account approval status'
+        // comment: 'Account approval status'
     },
     email_verified: {
         type: DataTypes.BOOLEAN,

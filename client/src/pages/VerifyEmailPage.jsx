@@ -11,7 +11,7 @@ export default function VerifyEmailPage() {
 
     const appName = settings?.nama_pt || 'Institut Teknologi dan Kesehatan Mahardika';
     const appLogo = settings?.logo_path
-        ? `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${settings.logo_path}?t=${new Date().getTime()}`
+        ? `/${settings.logo_path}?t=${new Date().getTime()}`
         : null;
 
     const initials = appName
