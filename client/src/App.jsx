@@ -66,11 +66,26 @@ import { useEffect } from 'react';
 import useGlobalStore from './store/useGlobalStore';
 
 function App() {
-    const { fetchSettings } = useGlobalStore();
+    const { fetchSettings, settings } = useGlobalStore();
 
     useEffect(() => {
         fetchSettings();
     }, [fetchSettings]);
+
+    // Update Favicon dynamically
+    useEffect(() => {
+        const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+        link.type = 'image/x-icon';
+        link.rel = 'shortcut icon';
+
+        if (settings?.favicon_path) {
+            link.href = `/${settings.favicon_path}?t=${new Date().getTime()}`;
+        } else {
+            link.href = '/vite.svg';
+        }
+
+        document.getElementsByTagName('head')[0].appendChild(link);
+    }, [settings?.favicon_path]);
 
     return (
         <BrowserRouter>

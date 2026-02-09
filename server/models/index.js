@@ -1,365 +1,513 @@
 // Import all models
-import User from './User.js';
-import UserProfile from './UserProfile.js';
-import Institusi from './Institusi.js';
-import Fakultas from './Fakultas.js';
-import Prodi from './Prodi.js';
-import ProfilLulusan from './ProfilLulusan.js';
-import CPL from './CPL.js';
-import MataKuliah from './MataKuliah.js';
-import CPMK from './CPMK.js';
-import SubCPMK from './SubCPMK.js';
-import BahanKajian from './BahanKajian.js';
-import MKBahanKajian from './MKBahanKajian.js';
-import Mahasiswa from './Mahasiswa.js';
-import RPS from './RPS.js';
-import RPSPertemuan from './RPSPertemuan.js';
-import PertemuanCPMK from './PertemuanCPMK.js';
-import PenilaianMK from './PenilaianMK.js';
-import NilaiMahasiswa from './NilaiMahasiswa.js';
-import Dosen from './Dosen.js';
-import DosenAssignment from './DosenAssignment.js';
-import GradingSystem from './GradingSystem.js';
-import GradeScale from './GradeScale.js';
-import GradeScaleDetail from './GradeScaleDetail.js';
-import AssessmentComponent from './AssessmentComponent.js';
-import StudentGrade from './StudentGrade.js';
-import FinalGrade from './FinalGrade.js';
-import Attendance from './Attendance.js';
-import Enrollment from './Enrollment.js';
-import Notification from './Notification.js';
-import AcademicYear from './AcademicYear.js';
-import CustomAdminRole from './CustomAdminRole.js';
-import MKAktif from './MKAktif.js';
+import User from "./User.js";
+import UserProfile from "./UserProfile.js";
+import Institusi from "./Institusi.js";
+import Fakultas from "./Fakultas.js";
+import Prodi from "./Prodi.js";
+import ProfilLulusan from "./ProfilLulusan.js";
+import CPL from "./CPL.js";
+import MataKuliah from "./MataKuliah.js";
+import CPMK from "./CPMK.js";
+import SubCPMK from "./SubCPMK.js";
+import BahanKajian from "./BahanKajian.js";
+import MKBahanKajian from "./MKBahanKajian.js";
+import Mahasiswa from "./Mahasiswa.js";
+import RPS from "./RPS.js";
+import RPSPertemuan from "./RPSPertemuan.js";
+import PertemuanCPMK from "./PertemuanCPMK.js";
+import PenilaianMK from "./PenilaianMK.js";
+import NilaiMahasiswa from "./NilaiMahasiswa.js";
+import Dosen from "./Dosen.js";
+import DosenAssignment from "./DosenAssignment.js";
+import GradingSystem from "./GradingSystem.js";
+import GradeScale from "./GradeScale.js";
+import GradeScaleDetail from "./GradeScaleDetail.js";
+import AssessmentComponent from "./AssessmentComponent.js";
+import StudentGrade from "./StudentGrade.js";
+import FinalGrade from "./FinalGrade.js";
+import Attendance from "./Attendance.js";
+import Enrollment from "./Enrollment.js";
+import Notification from "./Notification.js";
+import AcademicYear from "./AcademicYear.js";
+import CustomAdminRole from "./CustomAdminRole.js";
+import MKAktif from "./MKAktif.js";
+import GlobalSettings from "./GlobalSettings.js";
 
 // Define associations
 
 // ========== ORGANIZATIONAL HIERARCHY ==========
 // Institusi → Fakultas relationship
-Institusi.hasMany(Fakultas, { foreignKey: 'institusi_id', as: 'fakultas' });
-Fakultas.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
+Institusi.hasMany(Fakultas, { foreignKey: "institusi_id", as: "fakultas" });
+Fakultas.belongsTo(Institusi, { foreignKey: "institusi_id", as: "institusi" });
 
 // Fakultas → Prodi relationship
-Fakultas.hasMany(Prodi, { foreignKey: 'fakultas_id', as: 'prodi' });
-Prodi.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
+Fakultas.hasMany(Prodi, { foreignKey: "fakultas_id", as: "prodi" });
+Prodi.belongsTo(Fakultas, { foreignKey: "fakultas_id", as: "fakultas" });
 
 // Fakultas → User (Dekan) relationship
-Fakultas.belongsTo(User, { foreignKey: 'dekan_user_id', as: 'dekan' });
-User.hasOne(Fakultas, { foreignKey: 'dekan_user_id', as: 'fakultas_led' });
+Fakultas.belongsTo(User, { foreignKey: "dekan_user_id", as: "dekan" });
+User.hasOne(Fakultas, { foreignKey: "dekan_user_id", as: "fakultas_led" });
 
 // Prodi → User (Kaprodi) relationship
-Prodi.belongsTo(User, { foreignKey: 'kaprodi_user_id', as: 'kaprodi' });
-User.hasOne(Prodi, { foreignKey: 'kaprodi_user_id', as: 'prodi_led' });
+Prodi.belongsTo(User, { foreignKey: "kaprodi_user_id", as: "kaprodi" });
+User.hasOne(Prodi, { foreignKey: "kaprodi_user_id", as: "prodi_led" });
 
 // ========== USER ORGANIZATIONAL ASSIGNMENTS ==========
 // User → Institusi (for admin_institusi)
-Institusi.hasMany(User, { foreignKey: 'institusi_id', as: 'admin_users' });
-User.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
+Institusi.hasMany(User, { foreignKey: "institusi_id", as: "admin_users" });
+User.belongsTo(Institusi, { foreignKey: "institusi_id", as: "institusi" });
 
 // User → Fakultas (for dekan and cross-faculty staff)
-Fakultas.hasMany(User, { foreignKey: 'fakultas_id', as: 'users' });
-User.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
+Fakultas.hasMany(User, { foreignKey: "fakultas_id", as: "users" });
+User.belongsTo(Fakultas, { foreignKey: "fakultas_id", as: "fakultas" });
 
 // User → Prodi (for kaprodi, dosen, mahasiswa)
-Prodi.hasMany(User, { foreignKey: 'prodi_id', as: 'users' });
-User.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Prodi.hasMany(User, { foreignKey: "prodi_id", as: "users" });
+User.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
 
 // User → Dosen Profile
-User.hasOne(Dosen, { foreignKey: 'user_id', as: 'dosen' });
-Dosen.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
-Dosen.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
-Prodi.hasMany(Dosen, { foreignKey: 'prodi_id', as: 'dosen_list' });
+User.hasOne(Dosen, { foreignKey: "user_id", as: "dosen" });
+Dosen.belongsTo(User, { foreignKey: "user_id", as: "user" });
+Dosen.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
+Prodi.hasMany(Dosen, { foreignKey: "prodi_id", as: "dosen_list" });
 
 // ========== CPL MULTI-LEVEL HIERARCHY ==========
 // Institusi → CPL relationship (institut-level CPLs)
-Institusi.hasMany(CPL, { foreignKey: 'institusi_id', as: 'cpl' });
-CPL.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
+Institusi.hasMany(CPL, { foreignKey: "institusi_id", as: "cpl" });
+CPL.belongsTo(Institusi, { foreignKey: "institusi_id", as: "institusi" });
 
 // Fakultas → CPL relationship (fakultas-level CPLs)
-Fakultas.hasMany(CPL, { foreignKey: 'fakultas_id', as: 'cpl' });
-CPL.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
+Fakultas.hasMany(CPL, { foreignKey: "fakultas_id", as: "cpl" });
+CPL.belongsTo(Fakultas, { foreignKey: "fakultas_id", as: "fakultas" });
 
 // Prodi → CPL relationship (prodi-level CPLs)
-Prodi.hasMany(CPL, { foreignKey: 'prodi_id', as: 'cpl' });
-CPL.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Prodi.hasMany(CPL, { foreignKey: "prodi_id", as: "cpl" });
+CPL.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
 
 // Prodi → Profil Lulusan relationship
-Prodi.hasMany(ProfilLulusan, { foreignKey: 'prodi_id', as: 'profil_lulusan' });
-ProfilLulusan.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Prodi.hasMany(ProfilLulusan, { foreignKey: "prodi_id", as: "profil_lulusan" });
+ProfilLulusan.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
 
-Prodi.hasMany(MataKuliah, { foreignKey: 'prodi_id', as: 'mata_kuliah' });
-MataKuliah.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Prodi.hasMany(MataKuliah, { foreignKey: "prodi_id", as: "mata_kuliah" });
+MataKuliah.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
 
-Fakultas.hasMany(MataKuliah, { foreignKey: 'fakultas_id', as: 'mata_kuliah' });
-MataKuliah.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
+Fakultas.hasMany(MataKuliah, { foreignKey: "fakultas_id", as: "mata_kuliah" });
+MataKuliah.belongsTo(Fakultas, { foreignKey: "fakultas_id", as: "fakultas" });
 
-Institusi.hasMany(MataKuliah, { foreignKey: 'institusi_id', as: 'mata_kuliah' });
-MataKuliah.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
+Institusi.hasMany(MataKuliah, {
+  foreignKey: "institusi_id",
+  as: "mata_kuliah",
+});
+MataKuliah.belongsTo(Institusi, {
+  foreignKey: "institusi_id",
+  as: "institusi",
+});
 
-Prodi.hasMany(Mahasiswa, { foreignKey: 'prodi_id', as: 'mahasiswa' });
-Mahasiswa.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Prodi.hasMany(Mahasiswa, { foreignKey: "prodi_id", as: "mahasiswa" });
+Mahasiswa.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
 
 //PL -> CPL relationship
-ProfilLulusan.hasMany(CPL, { foreignKey: 'pl_id', as: 'cpl' });
-CPL.belongsTo(ProfilLulusan, { foreignKey: 'pl_id', as: 'profil_lulusan' });
+ProfilLulusan.hasMany(CPL, { foreignKey: "pl_id", as: "cpl" });
+CPL.belongsTo(ProfilLulusan, { foreignKey: "pl_id", as: "profil_lulusan" });
 
 // Mata Kuliah -> CPMK relationship
-MataKuliah.hasMany(CPMK, { foreignKey: 'mata_kuliah_id', as: 'cpmk' });
-CPMK.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mata_kuliah' });
+MataKuliah.hasMany(CPMK, { foreignKey: "mata_kuliah_id", as: "cpmk" });
+CPMK.belongsTo(MataKuliah, { foreignKey: "mata_kuliah_id", as: "mata_kuliah" });
 
 // CPL -> CPMK relationship (optional mapping)
-CPL.hasMany(CPMK, { foreignKey: 'cpl_id', as: 'cpmk' });
-CPMK.belongsTo(CPL, { foreignKey: 'cpl_id', as: 'cpl' });
+CPL.hasMany(CPMK, { foreignKey: "cpl_id", as: "cpmk" });
+CPMK.belongsTo(CPL, { foreignKey: "cpl_id", as: "cpl" });
 
 // CPMK -> Sub-CPMK relationship
-CPMK.hasMany(SubCPMK, { foreignKey: 'cpmk_id', as: 'sub_cpmk' });
-SubCPMK.belongsTo(CPMK, { foreignKey: 'cpmk_id', as: 'cpmk' });
+CPMK.hasMany(SubCPMK, { foreignKey: "cpmk_id", as: "sub_cpmk" });
+SubCPMK.belongsTo(CPMK, { foreignKey: "cpmk_id", as: "cpmk" });
 
 // User -> CPMK relationship (created_by)
-User.hasMany(CPMK, { foreignKey: 'created_by', as: 'created_cpmk' });
-CPMK.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+User.hasMany(CPMK, { foreignKey: "created_by", as: "created_cpmk" });
+CPMK.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 
 // ========== CURRICULUM ORGANIZATIONAL ASSHOCIATIONS ==========
 // Bahan Kajian
-Institusi.hasMany(BahanKajian, { foreignKey: 'institusi_id', as: 'bahan_kajian' });
-BahanKajian.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
-Fakultas.hasMany(BahanKajian, { foreignKey: 'fakultas_id', as: 'bahan_kajian' });
-BahanKajian.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
-Prodi.hasMany(BahanKajian, { foreignKey: 'prodi_id', as: 'bahan_kajian' });
-BahanKajian.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Institusi.hasMany(BahanKajian, {
+  foreignKey: "institusi_id",
+  as: "bahan_kajian",
+});
+BahanKajian.belongsTo(Institusi, {
+  foreignKey: "institusi_id",
+  as: "institusi",
+});
+Fakultas.hasMany(BahanKajian, {
+  foreignKey: "fakultas_id",
+  as: "bahan_kajian",
+});
+BahanKajian.belongsTo(Fakultas, { foreignKey: "fakultas_id", as: "fakultas" });
+Prodi.hasMany(BahanKajian, { foreignKey: "prodi_id", as: "bahan_kajian" });
+BahanKajian.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
 
 // CPMK
-Institusi.hasMany(CPMK, { foreignKey: 'institusi_id', as: 'cpmk' });
-CPMK.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
-Fakultas.hasMany(CPMK, { foreignKey: 'fakultas_id', as: 'cpmk' });
-CPMK.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
-Prodi.hasMany(CPMK, { foreignKey: 'prodi_id', as: 'cpmk' });
-CPMK.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Institusi.hasMany(CPMK, { foreignKey: "institusi_id", as: "cpmk" });
+CPMK.belongsTo(Institusi, { foreignKey: "institusi_id", as: "institusi" });
+Fakultas.hasMany(CPMK, { foreignKey: "fakultas_id", as: "cpmk" });
+CPMK.belongsTo(Fakultas, { foreignKey: "fakultas_id", as: "fakultas" });
+Prodi.hasMany(CPMK, { foreignKey: "prodi_id", as: "cpmk" });
+CPMK.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
 
 // Sub-CPMK
-Institusi.hasMany(SubCPMK, { foreignKey: 'institusi_id', as: 'sub_cpmk' });
-SubCPMK.belongsTo(Institusi, { foreignKey: 'institusi_id', as: 'institusi' });
-Fakultas.hasMany(SubCPMK, { foreignKey: 'fakultas_id', as: 'sub_cpmk' });
-SubCPMK.belongsTo(Fakultas, { foreignKey: 'fakultas_id', as: 'fakultas' });
-Prodi.hasMany(SubCPMK, { foreignKey: 'prodi_id', as: 'sub_cpmk' });
-SubCPMK.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
+Institusi.hasMany(SubCPMK, { foreignKey: "institusi_id", as: "sub_cpmk" });
+SubCPMK.belongsTo(Institusi, { foreignKey: "institusi_id", as: "institusi" });
+Fakultas.hasMany(SubCPMK, { foreignKey: "fakultas_id", as: "sub_cpmk" });
+SubCPMK.belongsTo(Fakultas, { foreignKey: "fakultas_id", as: "fakultas" });
+Prodi.hasMany(SubCPMK, { foreignKey: "prodi_id", as: "sub_cpmk" });
+SubCPMK.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
 
 // Mata Kuliah <-> Bahan Kajian (many-to-many via junction table)
 MataKuliah.belongsToMany(BahanKajian, {
-    through: MKBahanKajian,
-    foreignKey: 'mata_kuliah_id',
-    otherKey: 'bahan_kajian_id',
-    as: 'bahan_kajian'
+  through: MKBahanKajian,
+  foreignKey: "mata_kuliah_id",
+  otherKey: "bahan_kajian_id",
+  as: "bahan_kajian",
 });
 BahanKajian.belongsToMany(MataKuliah, {
-    through: MKBahanKajian,
-    foreignKey: 'bahan_kajian_id',
-    otherKey: 'mata_kuliah_id',
-    as: 'mata_kuliah'
+  through: MKBahanKajian,
+  foreignKey: "bahan_kajian_id",
+  otherKey: "mata_kuliah_id",
+  as: "mata_kuliah",
 });
-
 
 // ========== DOSEN ASSIGNMENT ==========
 // DosenAssignment relationships
-User.hasMany(DosenAssignment, { foreignKey: 'dosen_id', as: 'assignments' });
-DosenAssignment.belongsTo(User, { foreignKey: 'dosen_id', as: 'dosen' });
+User.hasMany(DosenAssignment, { foreignKey: "dosen_id", as: "assignments" });
+DosenAssignment.belongsTo(User, { foreignKey: "dosen_id", as: "dosen" });
 
-MataKuliah.hasMany(DosenAssignment, { foreignKey: 'mata_kuliah_id', as: 'assignments' });
-DosenAssignment.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mata_kuliah' });
+MataKuliah.hasMany(DosenAssignment, {
+  foreignKey: "mata_kuliah_id",
+  as: "assignments",
+});
+DosenAssignment.belongsTo(MataKuliah, {
+  foreignKey: "mata_kuliah_id",
+  as: "mata_kuliah",
+});
 
-User.hasMany(DosenAssignment, { foreignKey: 'assigned_by', as: 'assignments_made' });
-DosenAssignment.belongsTo(User, { foreignKey: 'assigned_by', as: 'assigner' });
+User.hasMany(DosenAssignment, {
+  foreignKey: "assigned_by",
+  as: "assignments_made",
+});
+DosenAssignment.belongsTo(User, { foreignKey: "assigned_by", as: "assigner" });
 
 // ========== RPS RELATIONSHIPS ==========
 // RPS → MataKuliah
-MataKuliah.hasMany(RPS, { foreignKey: 'mata_kuliah_id', as: 'rps' });
-RPS.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mata_kuliah' });
+MataKuliah.hasMany(RPS, { foreignKey: "mata_kuliah_id", as: "rps" });
+RPS.belongsTo(MataKuliah, { foreignKey: "mata_kuliah_id", as: "mata_kuliah" });
 
 // RPS → DosenAssignment (for instances, null for templates)
-DosenAssignment.hasMany(RPS, { foreignKey: 'assignment_id', as: 'rps_instances' });
-RPS.belongsTo(DosenAssignment, { foreignKey: 'assignment_id', as: 'assignment' });
+DosenAssignment.hasMany(RPS, {
+  foreignKey: "assignment_id",
+  as: "rps_instances",
+});
+RPS.belongsTo(DosenAssignment, {
+  foreignKey: "assignment_id",
+  as: "assignment",
+});
 
 // RPS → User (Dosen who created)
-User.hasMany(RPS, { foreignKey: 'dosen_id', as: 'rps_dibuat' });
-RPS.belongsTo(User, { foreignKey: 'dosen_id', as: 'dosen' });
+User.hasMany(RPS, { foreignKey: "dosen_id", as: "rps_dibuat" });
+RPS.belongsTo(User, { foreignKey: "dosen_id", as: "dosen" });
 
 // RPS → User (Kaprodi who approved)
-User.hasMany(RPS, { foreignKey: 'approved_by', as: 'rps_approved' });
-RPS.belongsTo(User, { foreignKey: 'approved_by', as: 'approver' });
+User.hasMany(RPS, { foreignKey: "approved_by", as: "rps_approved" });
+RPS.belongsTo(User, { foreignKey: "approved_by", as: "approver" });
 
 // RPS Template → RPS Instance (self-referencing)
-RPS.hasMany(RPS, { foreignKey: 'template_id', as: 'instances' });
-RPS.belongsTo(RPS, { foreignKey: 'template_id', as: 'template' });
+RPS.hasMany(RPS, { foreignKey: "template_id", as: "instances" });
+RPS.belongsTo(RPS, { foreignKey: "template_id", as: "template" });
 
 // RPS -> RPS Pertemuan relationship
-RPS.hasMany(RPSPertemuan, { foreignKey: 'rps_id', as: 'pertemuan' });
-RPSPertemuan.belongsTo(RPS, { foreignKey: 'rps_id', as: 'rps' });
+RPS.hasMany(RPSPertemuan, { foreignKey: "rps_id", as: "pertemuan" });
+RPSPertemuan.belongsTo(RPS, { foreignKey: "rps_id", as: "rps" });
 
 // RPS Pertemuan -> CPMK/Sub-CPMK (via junction table)
-RPSPertemuan.hasMany(PertemuanCPMK, { foreignKey: 'pertemuan_id', as: 'cpmk_mapping' });
-PertemuanCPMK.belongsTo(RPSPertemuan, { foreignKey: 'pertemuan_id', as: 'pertemuan' });
+RPSPertemuan.hasMany(PertemuanCPMK, {
+  foreignKey: "pertemuan_id",
+  as: "cpmk_mapping",
+});
+PertemuanCPMK.belongsTo(RPSPertemuan, {
+  foreignKey: "pertemuan_id",
+  as: "pertemuan",
+});
 
-CPMK.hasMany(PertemuanCPMK, { foreignKey: 'cpmk_id', as: 'pertemuan_mapping' });
-PertemuanCPMK.belongsTo(CPMK, { foreignKey: 'cpmk_id', as: 'cpmk' });
+CPMK.hasMany(PertemuanCPMK, { foreignKey: "cpmk_id", as: "pertemuan_mapping" });
+PertemuanCPMK.belongsTo(CPMK, { foreignKey: "cpmk_id", as: "cpmk" });
 
-SubCPMK.hasMany(PertemuanCPMK, { foreignKey: 'sub_cpmk_id', as: 'pertemuan_mapping' });
-PertemuanCPMK.belongsTo(SubCPMK, { foreignKey: 'sub_cpmk_id', as: 'sub_cpmk' });
+SubCPMK.hasMany(PertemuanCPMK, {
+  foreignKey: "sub_cpmk_id",
+  as: "pertemuan_mapping",
+});
+PertemuanCPMK.belongsTo(SubCPMK, { foreignKey: "sub_cpmk_id", as: "sub_cpmk" });
 
 // ========== GRADING SYSTEM ==========
 // GradingSystem -> Prodi
-GradingSystem.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
-Prodi.hasMany(GradingSystem, { foreignKey: 'prodi_id', as: 'gradingSystems' });
+GradingSystem.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
+Prodi.hasMany(GradingSystem, { foreignKey: "prodi_id", as: "gradingSystems" });
 
 // GradingSystem -> GradeScale
-GradingSystem.belongsTo(GradeScale, { foreignKey: 'grade_scale_id', as: 'gradeScale' });
-GradeScale.hasMany(GradingSystem, { foreignKey: 'grade_scale_id', as: 'gradingSystems' });
+GradingSystem.belongsTo(GradeScale, {
+  foreignKey: "grade_scale_id",
+  as: "gradeScale",
+});
+GradeScale.hasMany(GradingSystem, {
+  foreignKey: "grade_scale_id",
+  as: "gradingSystems",
+});
 
 // GradeScale -> GradeScaleDetails
-GradeScale.hasMany(GradeScaleDetail, { foreignKey: 'grade_scale_id', as: 'details' });
-GradeScaleDetail.belongsTo(GradeScale, { foreignKey: 'grade_scale_id', as: 'gradeScale' });
+GradeScale.hasMany(GradeScaleDetail, {
+  foreignKey: "grade_scale_id",
+  as: "details",
+});
+GradeScaleDetail.belongsTo(GradeScale, {
+  foreignKey: "grade_scale_id",
+  as: "gradeScale",
+});
 
 // AssessmentComponent -> MataKuliah
-AssessmentComponent.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mataKuliah' });
-MataKuliah.hasMany(AssessmentComponent, { foreignKey: 'mata_kuliah_id', as: 'assessmentComponents' });
+AssessmentComponent.belongsTo(MataKuliah, {
+  foreignKey: "mata_kuliah_id",
+  as: "mataKuliah",
+});
+MataKuliah.hasMany(AssessmentComponent, {
+  foreignKey: "mata_kuliah_id",
+  as: "assessmentComponents",
+});
 
 // AssessmentComponent -> SubCPMK (OBE mode)
-AssessmentComponent.belongsTo(SubCPMK, { foreignKey: 'sub_cpmk_id', as: 'subCpmk' });
-SubCPMK.hasMany(AssessmentComponent, { foreignKey: 'sub_cpmk_id', as: 'assessmentComponents' });
+AssessmentComponent.belongsTo(SubCPMK, {
+  foreignKey: "sub_cpmk_id",
+  as: "subCpmk",
+});
+SubCPMK.hasMany(AssessmentComponent, {
+  foreignKey: "sub_cpmk_id",
+  as: "assessmentComponents",
+});
 
 // StudentGrade -> Mahasiswa
-StudentGrade.belongsTo(Mahasiswa, { foreignKey: 'mahasiswa_id', as: 'mahasiswa' });
-Mahasiswa.hasMany(StudentGrade, { foreignKey: 'mahasiswa_id', as: 'studentGrades' });
+StudentGrade.belongsTo(Mahasiswa, {
+  foreignKey: "mahasiswa_id",
+  as: "mahasiswa",
+});
+Mahasiswa.hasMany(StudentGrade, {
+  foreignKey: "mahasiswa_id",
+  as: "studentGrades",
+});
 
 // StudentGrade -> MataKuliah
-StudentGrade.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mataKuliah' });
-MataKuliah.hasMany(StudentGrade, { foreignKey: 'mata_kuliah_id', as: 'studentGrades' });
+StudentGrade.belongsTo(MataKuliah, {
+  foreignKey: "mata_kuliah_id",
+  as: "mataKuliah",
+});
+MataKuliah.hasMany(StudentGrade, {
+  foreignKey: "mata_kuliah_id",
+  as: "studentGrades",
+});
 
 // StudentGrade -> AssessmentComponent
-StudentGrade.belongsTo(AssessmentComponent, { foreignKey: 'assessment_component_id', as: 'assessmentComponent' });
-AssessmentComponent.hasMany(StudentGrade, { foreignKey: 'assessment_component_id', as: 'studentGrades' });
+StudentGrade.belongsTo(AssessmentComponent, {
+  foreignKey: "assessment_component_id",
+  as: "assessmentComponent",
+});
+AssessmentComponent.hasMany(StudentGrade, {
+  foreignKey: "assessment_component_id",
+  as: "studentGrades",
+});
 
 // StudentGrade -> User (graded_by)
-StudentGrade.belongsTo(User, { foreignKey: 'graded_by', as: 'gradedBy' });
-User.hasMany(StudentGrade, { foreignKey: 'graded_by', as: 'gradesGiven' });
+StudentGrade.belongsTo(User, { foreignKey: "graded_by", as: "gradedBy" });
+User.hasMany(StudentGrade, { foreignKey: "graded_by", as: "gradesGiven" });
 
 // FinalGrade -> Mahasiswa
-FinalGrade.belongsTo(Mahasiswa, { foreignKey: 'mahasiswa_id', as: 'mahasiswa' });
-Mahasiswa.hasMany(FinalGrade, { foreignKey: 'mahasiswa_id', as: 'finalGrades' });
+FinalGrade.belongsTo(Mahasiswa, {
+  foreignKey: "mahasiswa_id",
+  as: "mahasiswa",
+});
+Mahasiswa.hasMany(FinalGrade, {
+  foreignKey: "mahasiswa_id",
+  as: "finalGrades",
+});
 
 // FinalGrade -> MataKuliah
-FinalGrade.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mataKuliah' });
-MataKuliah.hasMany(FinalGrade, { foreignKey: 'mata_kuliah_id', as: 'finalGrades' });
+FinalGrade.belongsTo(MataKuliah, {
+  foreignKey: "mata_kuliah_id",
+  as: "mataKuliah",
+});
+MataKuliah.hasMany(FinalGrade, {
+  foreignKey: "mata_kuliah_id",
+  as: "finalGrades",
+});
 
 // FinalGrade -> GradingSystem
-FinalGrade.belongsTo(GradingSystem, { foreignKey: 'grading_system_id', as: 'gradingSystem' });
-GradingSystem.hasMany(FinalGrade, { foreignKey: 'grading_system_id', as: 'finalGrades' });
+FinalGrade.belongsTo(GradingSystem, {
+  foreignKey: "grading_system_id",
+  as: "gradingSystem",
+});
+GradingSystem.hasMany(FinalGrade, {
+  foreignKey: "grading_system_id",
+  as: "finalGrades",
+});
 
 // FinalGrade -> User (approved_by)
-FinalGrade.belongsTo(User, { foreignKey: 'approved_by', as: 'approvedBy' });
-User.hasMany(FinalGrade, { foreignKey: 'approved_by', as: 'gradesApproved' });
+FinalGrade.belongsTo(User, { foreignKey: "approved_by", as: "approvedBy" });
+User.hasMany(FinalGrade, { foreignKey: "approved_by", as: "gradesApproved" });
 
 // ========== ATTENDANCE ==========
 // Attendance -> Mahasiswa
-Attendance.belongsTo(Mahasiswa, { foreignKey: 'mahasiswa_id', as: 'mahasiswa' });
-Mahasiswa.hasMany(Attendance, { foreignKey: 'mahasiswa_id', as: 'attendance' });
+Attendance.belongsTo(Mahasiswa, {
+  foreignKey: "mahasiswa_id",
+  as: "mahasiswa",
+});
+Mahasiswa.hasMany(Attendance, { foreignKey: "mahasiswa_id", as: "attendance" });
 
 // Attendance -> RPSPertemuan
-Attendance.belongsTo(RPSPertemuan, { foreignKey: 'rps_pertemuan_id', as: 'rpsPertemuan' });
-RPSPertemuan.hasMany(Attendance, { foreignKey: 'rps_pertemuan_id', as: 'attendance' });
+Attendance.belongsTo(RPSPertemuan, {
+  foreignKey: "rps_pertemuan_id",
+  as: "rpsPertemuan",
+});
+RPSPertemuan.hasMany(Attendance, {
+  foreignKey: "rps_pertemuan_id",
+  as: "attendance",
+});
 
 // Attendance -> User (marked_by)
-Attendance.belongsTo(User, { foreignKey: 'marked_by', as: 'markedBy' });
-User.hasMany(Attendance, { foreignKey: 'marked_by', as: 'attendanceMarked' });
+Attendance.belongsTo(User, { foreignKey: "marked_by", as: "markedBy" });
+User.hasMany(Attendance, { foreignKey: "marked_by", as: "attendanceMarked" });
 
 // ========== ENROLLMENT ==========
 // Enrollment -> Mahasiswa
-Enrollment.belongsTo(Mahasiswa, { foreignKey: 'mahasiswa_id', as: 'mahasiswa' });
-Mahasiswa.hasMany(Enrollment, { foreignKey: 'mahasiswa_id', as: 'enrollments' });
+Enrollment.belongsTo(Mahasiswa, {
+  foreignKey: "mahasiswa_id",
+  as: "mahasiswa",
+});
+Mahasiswa.hasMany(Enrollment, {
+  foreignKey: "mahasiswa_id",
+  as: "enrollments",
+});
 
 // Enrollment -> MataKuliah
-Enrollment.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mataKuliah' });
-MataKuliah.hasMany(Enrollment, { foreignKey: 'mata_kuliah_id', as: 'enrollments' });
+Enrollment.belongsTo(MataKuliah, {
+  foreignKey: "mata_kuliah_id",
+  as: "mataKuliah",
+});
+MataKuliah.hasMany(Enrollment, {
+  foreignKey: "mata_kuliah_id",
+  as: "enrollments",
+});
 
 // RPS -> Penilaian MK relationship
-RPS.hasMany(PenilaianMK, { foreignKey: 'rps_id', as: 'penilaian' });
-PenilaianMK.belongsTo(RPS, { foreignKey: 'rps_id', as: 'rps' });
+RPS.hasMany(PenilaianMK, { foreignKey: "rps_id", as: "penilaian" });
+PenilaianMK.belongsTo(RPS, { foreignKey: "rps_id", as: "rps" });
 
 // Penilaian MK -> Nilai Mahasiswa relationship
-PenilaianMK.hasMany(NilaiMahasiswa, { foreignKey: 'penilaian_mk_id', as: 'nilai_mahasiswa' });
-NilaiMahasiswa.belongsTo(PenilaianMK, { foreignKey: 'penilaian_mk_id', as: 'penilaian' });
+PenilaianMK.hasMany(NilaiMahasiswa, {
+  foreignKey: "penilaian_mk_id",
+  as: "nilai_mahasiswa",
+});
+NilaiMahasiswa.belongsTo(PenilaianMK, {
+  foreignKey: "penilaian_mk_id",
+  as: "penilaian",
+});
 
 // Mahasiswa -> Nilai relationship
-Mahasiswa.hasMany(NilaiMahasiswa, { foreignKey: 'mahasiswa_id', as: 'nilai' });
-NilaiMahasiswa.belongsTo(Mahasiswa, { foreignKey: 'mahasiswa_id', as: 'mahasiswa' });
+Mahasiswa.hasMany(NilaiMahasiswa, { foreignKey: "mahasiswa_id", as: "nilai" });
+NilaiMahasiswa.belongsTo(Mahasiswa, {
+  foreignKey: "mahasiswa_id",
+  as: "mahasiswa",
+});
 
 // CPL/CPMK/Sub-CPMK -> Nilai relationship
-CPL.hasMany(NilaiMahasiswa, { foreignKey: 'cpl_id', as: 'nilai' });
-NilaiMahasiswa.belongsTo(CPL, { foreignKey: 'cpl_id', as: 'cpl' });
+CPL.hasMany(NilaiMahasiswa, { foreignKey: "cpl_id", as: "nilai" });
+NilaiMahasiswa.belongsTo(CPL, { foreignKey: "cpl_id", as: "cpl" });
 
-CPMK.hasMany(NilaiMahasiswa, { foreignKey: 'cpmk_id', as: 'nilai' });
-NilaiMahasiswa.belongsTo(CPMK, { foreignKey: 'cpmk_id', as: 'cpmk' });
+CPMK.hasMany(NilaiMahasiswa, { foreignKey: "cpmk_id", as: "nilai" });
+NilaiMahasiswa.belongsTo(CPMK, { foreignKey: "cpmk_id", as: "cpmk" });
 
-SubCPMK.hasMany(NilaiMahasiswa, { foreignKey: 'sub_cpmk_id', as: 'nilai' });
-NilaiMahasiswa.belongsTo(SubCPMK, { foreignKey: 'sub_cpmk_id', as: 'sub_cpmk' });
+SubCPMK.hasMany(NilaiMahasiswa, { foreignKey: "sub_cpmk_id", as: "nilai" });
+NilaiMahasiswa.belongsTo(SubCPMK, {
+  foreignKey: "sub_cpmk_id",
+  as: "sub_cpmk",
+});
 
 // ========== NOTIFICATIONS ==========
-User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications' });
-Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(Notification, { foreignKey: "user_id", as: "notifications" });
+Notification.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
 // User -> UserProfile
-User.hasOne(UserProfile, { foreignKey: 'user_id', as: 'profile' });
-UserProfile.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasOne(UserProfile, { foreignKey: "user_id", as: "profile" });
+UserProfile.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
 // User -> CustomAdminRole (created_by)
-User.hasMany(CustomAdminRole, { foreignKey: 'created_by', as: 'created_roles' });
-CustomAdminRole.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+User.hasMany(CustomAdminRole, {
+  foreignKey: "created_by",
+  as: "created_roles",
+});
+CustomAdminRole.belongsTo(User, { foreignKey: "created_by", as: "creator" });
 
 // ========== MK AKTIF (Course Distribution) ==========
-MKAktif.belongsTo(MataKuliah, { foreignKey: 'mata_kuliah_id', as: 'mata_kuliah' });
-MataKuliah.hasMany(MKAktif, { foreignKey: 'mata_kuliah_id', as: 'mk_aktif' });
+MKAktif.belongsTo(MataKuliah, {
+  foreignKey: "mata_kuliah_id",
+  as: "mata_kuliah",
+});
+MataKuliah.hasMany(MKAktif, { foreignKey: "mata_kuliah_id", as: "mk_aktif" });
 
-MKAktif.belongsTo(Prodi, { foreignKey: 'prodi_id', as: 'prodi' });
-Prodi.hasMany(MKAktif, { foreignKey: 'prodi_id', as: 'mk_aktif' });
+MKAktif.belongsTo(Prodi, { foreignKey: "prodi_id", as: "prodi" });
+Prodi.hasMany(MKAktif, { foreignKey: "prodi_id", as: "mk_aktif" });
 
-MKAktif.belongsTo(AcademicYear, { foreignKey: 'tahun_akademik_id', as: 'tahun_akademik' });
-AcademicYear.hasMany(MKAktif, { foreignKey: 'tahun_akademik_id', as: 'mk_aktif' });
+MKAktif.belongsTo(AcademicYear, {
+  foreignKey: "tahun_akademik_id",
+  as: "tahun_akademik",
+});
+AcademicYear.hasMany(MKAktif, {
+  foreignKey: "tahun_akademik_id",
+  as: "mk_aktif",
+});
 
-MKAktif.belongsTo(User, { foreignKey: 'dosen_pengampu_id', as: 'dosen_pengampu' });
-User.hasMany(MKAktif, { foreignKey: 'dosen_pengampu_id', as: 'mk_diampu' });
+MKAktif.belongsTo(User, {
+  foreignKey: "dosen_pengampu_id",
+  as: "dosen_pengampu",
+});
+User.hasMany(MKAktif, { foreignKey: "dosen_pengampu_id", as: "mk_diampu" });
 
 // Export all models
 export {
-    User,
-    UserProfile, // Add this
-    Institusi,
-    // ...
-    Fakultas,
-    Prodi,
-    ProfilLulusan,
-    CPL,
-    MataKuliah,
-    CPMK,
-    SubCPMK,
-    BahanKajian,
-    MKBahanKajian,
-    Mahasiswa,
-    RPS,
-    RPSPertemuan,
-    PertemuanCPMK,
-    PenilaianMK,
-    NilaiMahasiswa,
-    DosenAssignment,
-    Dosen,
-    GradingSystem,
-    GradeScale,
-    GradeScaleDetail,
-    AssessmentComponent,
-    StudentGrade,
-    FinalGrade,
-    Attendance,
-    Enrollment,
-    Notification,
-    AcademicYear,
-    CustomAdminRole,
-    MKAktif
+  User,
+  UserProfile, // Add this
+  Institusi,
+  // ...
+  Fakultas,
+  Prodi,
+  ProfilLulusan,
+  CPL,
+  MataKuliah,
+  CPMK,
+  SubCPMK,
+  BahanKajian,
+  MKBahanKajian,
+  Mahasiswa,
+  RPS,
+  RPSPertemuan,
+  PertemuanCPMK,
+  PenilaianMK,
+  NilaiMahasiswa,
+  DosenAssignment,
+  Dosen,
+  GradingSystem,
+  GradeScale,
+  GradeScaleDetail,
+  AssessmentComponent,
+  StudentGrade,
+  FinalGrade,
+  Attendance,
+  Enrollment,
+  Notification,
+  AcademicYear,
+  CustomAdminRole,
+  MKAktif,
+  GlobalSettings,
 };

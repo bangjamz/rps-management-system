@@ -160,7 +160,7 @@ export default function RPSViewPage() {
                                     <td className="border border-black p-2 w-24 text-center align-middle">
                                         {settings?.logo_path ? (
                                             <img
-                                                src={`${import.meta.env.VITE_API_URL?.replace('/api', '')}/${settings.logo_path}?t=${new Date().getTime()}`}
+                                                src={`/${settings.logo_path}?t=${new Date().getTime()}`}
                                                 alt="Logo"
                                                 className="w-20 h-20 object-contain mx-auto"
                                                 onError={(e) => {
