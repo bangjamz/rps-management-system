@@ -382,7 +382,7 @@ const SuperAdminDashboard = () => {
                     <div className="bg-white dark:bg-gray-800 rounded-lg w-10 h-10 flex items-center justify-center overflow-hidden border dark:border-gray-700 shadow-sm shrink-0">
                         <img
                             src={settings?.logo_path
-                                ? `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${settings.logo_path}?t=${new Date().getTime()}`
+                                ? `/${settings.logo_path}?t=${new Date().getTime()}`
                                 : null}
                             alt={settings?.nama_pt || 'Institut Mahardika'}
                             className="w-full h-full object-contain"

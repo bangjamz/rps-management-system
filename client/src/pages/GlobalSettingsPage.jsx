@@ -53,7 +53,7 @@ const LogoUploader = ({ label, currentImage, onFileSelect, onDelete, className =
         onDelete();
     };
 
-    const displayImage = preview || (currentImage?.startsWith('http') ? currentImage : (currentImage ? `${import.meta.env.VITE_API_URL?.replace('/api', '')}/${currentImage}?t=${new Date().getTime()}` : null));
+    const displayImage = preview || (currentImage?.startsWith('http') ? currentImage : (currentImage ? `/${currentImage}?t=${new Date().getTime()}` : null));
 
     return (
         <div className="space-y-2">

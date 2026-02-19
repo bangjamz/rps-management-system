@@ -29,7 +29,7 @@ export default function ProfileSetupPage() {
         // Mahasiswa
         nim: '',
         angkatan: new Date().getFullYear(),
-        status_mahasiswa: 'active'
+        status_mahasiswa: 'aktif'
     });
 
     useEffect(() => {
@@ -67,7 +67,7 @@ export default function ProfileSetupPage() {
         try {
             const payload = {
                 ...formData,
-                profile_type: user.role === 'dosen' ? 'dosen' : 'mahasiswa'
+                profile_type: (user.role === 'dosen' || user.role === 'kaprodi') ? 'dosen' : 'mahasiswa'
             };
 
             const response = await axios.post('/profile', payload);
